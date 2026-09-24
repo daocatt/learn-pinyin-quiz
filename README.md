@@ -130,6 +130,9 @@ API** rather than `<audio>` elements, which buys two things:
 - The two halves of a 组词 are scheduled with a **small deliberate overlap**, so
   the word sounds linked rather than stitched together at a seam.
 
+> The recordings were collected from the internet and are bundled here so the app
+> works out of the box. They are not produced by this project.
+
 ## How the generated tables are built
 
 `src/shared/chart-data.ts`, `hanzi.ts` and `words.ts` are **generated** — each
