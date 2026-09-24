@@ -1,0 +1,889 @@
+/*
+ * Tailwind 的自动源码探测会扫整个工作目录，而这个目录里躺着测试脚本（test.mjs、
+ * quiz_test.mjs）、Python 生成器和日志。那些文件里的英文单词会被当成 class 名
+ * 注进产物——实测从仓库构建出 23.17 kB CSS，从只含部署文件的干净目录构建只有
+ * 17.27 kB；逐选择器比对，多出来的 34 个里有 .sticky .shadow .invert .isolate
+ * .ordinal .lowercase 这类词，还有从 words.ts 的拼音标注 [lu:2] 生成的空规则
+ * .\[lu\:2\]{lu:2}（无任何声明）。应用里一个都没用到。
+ *
+ * 更麻烦的是这会让同一份源码产出两个不同的 CSS，取决于旁边有没有散落的脚本。
+ * 所以关掉自动探测，只显式声明真正带 class 的地方：5 个 .tsx 组件加 index.html。
+ * 全项目没有一处 @apply，缩小扫描范围不会漏掉任何按需生成的工具类。
+ */
+@import "tailwindcss" source(none);
+@source "./**/*.tsx";
+@source "../../index.html";
+
+@theme {
+  /* Two-tone green system: a deep green for headings, mint for accents. */
+  --color-brand: #0b6b41;
+  --color-accent: #74d990;
+  --color-muted: #7e8c84;
+  --color-ink: #2b2b2b;
+  --font-sans: "Avenir Next", "Avenir W01", Avenir, "Helvetica Neue", Helvetica,
+    Arial, sans-serif;
+}
+
+/* ---------------------------------------------------------------------------
+   Interactive pinyin chart.
+   Structural rules only; colours and hover states are applied with Tailwind
+   utilities from the React components.
+--------------------------------------------------------------------------- */
+
+.pinyin-table {
+  width: 100%;
+  background: #fff;
+  border: 1px solid #000;
+  border-collapse: collapse;
+  border-spacing: 0;
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.pinyin-table th,
+.pinyin-table td {
+  padding: 4px 3px;
+  text-align: center;
+  border-left: 1px solid transparent;
+  border-right: 1px solid transparent;
+  border-top: 1px solid transparent;
+  transition: all 0.1s ease-in;
+}
+
+.pinyin-table td {
+  cursor: pointer;
+}
+
+/* The initial column and the finals row are labels, not controls. */
+.pinyin-table td:first-child {
+  border-left: 1px solid #000;
+  cursor: default;
+  pointer-events: none;
+}
+
+.pinyin-table td:first-child b {
+  padding-left: 2px;
+  padding-right: 2px;
+}
+
+.pinyin-table td:last-child {
+  border-right: 1px solid #000;
+}
+
+/* Columns that end a vowel group get a solid divider. */
+.pinyin-table td.group-end {
+  border-right: 1px solid #000;
+}
+
+.pinyin-table thead th {
+  background: #a9c4b3;
+  border: 1px solid #000;
+  color: #000;
+  font-size: 15px;
+  font-weight: 900;
+  cursor: default;
+}
+
+@media (max-width: 980px) {
+  .pinyin-table thead th {
+    font-size: 13px;
+  }
+}
+
+/* The finals row is a label row, and the weight is uniform across it — the
+   colour alone marks which finals have a recording. */
+.pinyin-table .finals-row td {
+  background: #d5e6db;
+  font-size: 13px;
+  pointer-events: none;
+}
+
+/* Finals that have a recording: tinted and clickable. The rest stay the
+   inherited black and are inert. */
+.pinyin-table .finals-row td.finals-row__audio {
+  color: #0b6b41;
+  pointer-events: auto;
+  cursor: pointer;
+}
+
+.pinyin-table .finals-row td.finals-row__audio:hover {
+  background-color: #c2dccb;
+}
+
+.pinyin-table tbody td b {
+  font-weight: 900;
+}
+
+/* ---------------------------------------------------------------------------
+   Floating tone player: a horizontal row of tone cards, one per tone.
+   Vertically centred on the clicked cell via translateY(-50%), so the pointer
+   lines up with the cell without the component measuring the popup.
+--------------------------------------------------------------------------- */
+
+.snd-player {
+  /* absolute, not fixed: the popup is anchored in document coordinates so it
+     scrolls together with the cell it points at. */
+  position: absolute;
+  top: 0;
+  left: 0;
+  display: block;
+  z-index: 40;
+  padding: 14px;
+  border: 1px solid #cfe3d7;
+  border-radius: 14px;
+  background-color: #fff;
+  box-shadow:
+    0 10px 30px rgb(11 107 65 / 0.16),
+    0 2px 8px rgb(0 0 0 / 0.08);
+  text-align: left;
+  transform: translateY(-50%);
+}
+
+/* Plate that hides the half of the pointer sitting inside the bubble. */
+.snd-player::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -10;
+  border-radius: inherit;
+  background-color: #fff;
+}
+
+.snd-player__row {
+  display: flex;
+  gap: 8px;
+}
+
+.snd-player__card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 62px;
+  padding: 8px 9px 10px;
+  border: 1px solid #e2efe7;
+  border-radius: 10px;
+  background-color: #f7fbf8;
+  font: inherit;
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    background-color 0.12s ease-in,
+    border-color 0.12s ease-in;
+}
+
+.snd-player__card.is-loaded:hover {
+  border-color: #74d990;
+  background-color: #eaf7ef;
+}
+
+/* A tone with no recording stays readable but loses its hover affordance. */
+.snd-player__card:not(.is-loaded) {
+  cursor: default;
+}
+
+.snd-player__card:not(.is-loaded) .snd-player__icon {
+  opacity: 0.15;
+}
+
+.snd-player__icon {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  font-size: 12px;
+  line-height: 1;
+  opacity: 0.5;
+}
+
+/* Leaves room for the speaker glyph pinned in the corner above it. */
+.snd-player__pinyin {
+  margin-top: 11px;
+  color: #0b6b41;
+  font-size: 15px;
+  line-height: 1.2;
+}
+
+.snd-player__hanzi {
+  margin-top: 3px;
+  color: #2b2b2b;
+  font-size: 30px;
+  line-height: 1.15;
+}
+
+/* Tone does not exist in Mandarin, so no example character is shown. */
+.snd-player__hanzi--empty {
+  color: #c3cfc8;
+}
+
+.snd-player__pointer {
+  position: absolute;
+  top: 50%;
+  z-index: -13;
+  display: block;
+  width: 14px;
+  height: 14px;
+  background-color: #fff;
+  transform: translateY(-50%) rotate(45deg);
+  box-shadow: 0 2px 8px rgb(0 0 0 / 0.08);
+}
+
+.snd-player__pointer--left {
+  left: -7px;
+}
+
+.snd-player__pointer--right {
+  right: -7px;
+}
+
+/* ---------------------------------------------------------------------------
+   Quiz. One exam card, centred on a paper-toned backdrop. The palette is the
+   chart's green; the restraint (thin rules, tabular figures, letter-spaced
+   labels) is what makes it read as a test rather than a game.
+
+   Note on the letter-spaced labels: the trailing letter-space is NOT part of
+   the line box, so tracked-out centred text already sits on the centre line.
+   An extra `text-indent` to "compensate" pushes it half an indent off centre —
+   measured at 1-3px across these labels before it was removed.
+--------------------------------------------------------------------------- */
+
+.quiz-page {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  background-color: #eef3ef;
+  background-image:
+    radial-gradient(1100px 460px at 50% -12%, #ffffff 0%, rgb(255 255 255 / 0) 70%),
+    repeating-linear-gradient(0deg, rgb(11 107 65 / 0.04) 0 1px, transparent 1px 28px);
+}
+
+/* Three columns rather than space-between: the back pill is much wider than
+   the 共 N 题 counter, which used to push the title off centre. */
+.quiz-topbar {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 16px;
+  padding: 16px 24px;
+  border-bottom: 1px solid rgb(11 107 65 / 0.12);
+}
+
+.quiz-topbar__title {
+  justify-self: center;
+  color: #0b6b41;
+  font-size: 13px;
+  letter-spacing: 0.34em;
+}
+
+.quiz-topbar__meta {
+  justify-self: end;
+  color: #9db0a5;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.08em;
+}
+
+.quiz-back,
+.quiz-ghost {
+  padding: 6px 14px;
+  border: 1px solid rgb(11 107 65 / 0.22);
+  border-radius: 999px;
+  background: transparent;
+  color: #0b6b41;
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+  transition:
+    background-color 0.15s ease-in,
+    border-color 0.15s ease-in;
+}
+
+.quiz-back {
+  justify-self: start;
+}
+
+.quiz-back:hover,
+.quiz-ghost:hover {
+  border-color: #0b6b41;
+  background-color: rgb(116 217 144 / 0.16);
+}
+
+.quiz-stage {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 36px 16px 60px;
+}
+
+.quiz-status {
+  color: #7e8c84;
+  font-size: 14px;
+  letter-spacing: 0.06em;
+}
+
+.quiz-status--error {
+  color: #a84545;
+}
+
+.quiz-status__retry {
+  margin-left: 10px;
+  padding: 4px 12px;
+  border: 1px solid currentColor;
+  border-radius: 999px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.quiz-card {
+  position: relative;
+  width: 100%;
+  max-width: 620px;
+  padding: 26px 30px 22px;
+  border: 1px solid #dfe9e2;
+  border-radius: 18px;
+  background: #fff;
+  box-shadow:
+    0 28px 60px -34px rgb(11 107 65 / 0.5),
+    0 4px 14px rgb(11 107 65 / 0.06);
+  overflow: hidden;
+}
+
+/* Accent rule across the top edge, like the head of a printed exam sheet. */
+.quiz-card::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto;
+  height: 4px;
+  background: linear-gradient(90deg, #0b6b41, #74d990);
+}
+
+.quiz-card__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+  padding-bottom: 12px;
+  border-bottom: 2px solid #eef3ef;
+}
+
+.quiz-meta {
+  display: flex;
+  align-items: baseline;
+  gap: 9px;
+}
+
+.quiz-meta__label {
+  color: #9db0a5;
+  font-size: 11px;
+  letter-spacing: 0.2em;
+}
+
+.quiz-meta__value {
+  color: #0b6b41;
+  font-size: 20px;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+
+.quiz-meta__of {
+  margin-left: 3px;
+  color: #b3c3ba;
+  font-size: 13px;
+}
+
+.quiz-progress {
+  display: flex;
+  gap: 4px;
+  margin: 14px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.quiz-progress__item {
+  flex: 1;
+  display: flex;
+}
+
+.quiz-progress__seg {
+  flex: 1;
+  height: 4px;
+  padding: 0;
+  border: 0;
+  border-radius: 2px;
+  background-color: #e4ece7;
+  cursor: pointer;
+  transition:
+    background-color 0.15s ease-in,
+    transform 0.15s ease-in;
+}
+
+.quiz-progress__seg:hover {
+  background-color: #c2dccb;
+}
+
+/* Where the learner is now. Declared before the result colours so that an
+   answered segment still reads green or red — the scale alone marks it. */
+.quiz-progress__seg.is-current {
+  background-color: #0b6b41;
+  transform: scaleY(2.2);
+}
+
+.quiz-progress__seg.is-right {
+  background-color: #74d990;
+}
+
+.quiz-progress__seg.is-wrong {
+  background-color: #e5a4a4;
+}
+
+.quiz-question {
+  margin-top: 18px;
+  padding: 24px 22px 20px;
+  border-radius: 14px;
+  background: radial-gradient(140% 130% at 50% 0%, #128054 0%, #0b6b41 58%, #08522f 100%);
+  text-align: center;
+}
+
+.quiz-question__label {
+  color: rgb(255 255 255 / 0.6);
+  font-size: 11px;
+  letter-spacing: 0.22em;
+}
+
+.quiz-question__pinyin {
+  margin-top: 8px;
+  color: #fff;
+  font-size: 56px;
+  font-weight: 300;
+  letter-spacing: 0.06em;
+  line-height: 1.05;
+  text-shadow: 0 2px 18px rgb(0 0 0 / 0.18);
+}
+
+.quiz-question__word {
+  margin-top: 4px;
+  color: rgb(255 255 255 / 0.92);
+  font-size: 22px;
+  letter-spacing: 0.3em;
+}
+
+.quiz-question__retry {
+  display: inline-block;
+  margin-top: 12px;
+  padding: 3px 11px;
+  border: 1px solid rgb(255 255 255 / 0.36);
+  border-radius: 999px;
+  color: rgb(255 255 255 / 0.86);
+  font-size: 11px;
+  letter-spacing: 0.12em;
+}
+
+.quiz-replay {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 16px;
+  padding: 7px 15px;
+  border: 1px solid rgb(255 255 255 / 0.42);
+  border-radius: 999px;
+  background: rgb(255 255 255 / 0.1);
+  color: #fff;
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+  transition:
+    background-color 0.15s ease-in,
+    border-color 0.15s ease-in;
+}
+
+.quiz-replay:hover {
+  border-color: rgb(255 255 255 / 0.8);
+  background: rgb(255 255 255 / 0.22);
+}
+
+.quiz-options {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-top: 18px;
+}
+
+.quiz-option {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 11px 14px;
+  border: 1px solid #e2ebe6;
+  border-radius: 12px;
+  background: #fbfdfc;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    border-color 0.15s ease-in,
+    background-color 0.15s ease-in,
+    transform 0.15s ease-in,
+    box-shadow 0.15s ease-in;
+}
+
+.quiz-option:not(:disabled):hover {
+  border-color: #74d990;
+  background: #f2faf5;
+  box-shadow: 0 10px 20px -14px rgb(11 107 65 / 0.6);
+  transform: translateY(-1px);
+}
+
+.quiz-option:disabled {
+  cursor: default;
+}
+
+.quiz-option__letter {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 26px;
+  height: 26px;
+  border: 1px solid #d7e4dc;
+  border-radius: 8px;
+  background: #fff;
+  color: #7e8c84;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.quiz-option__body {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.quiz-option__pinyin {
+  color: #0b6b41;
+  font-size: 24px;
+  line-height: 1.15;
+}
+
+.quiz-option__tone {
+  color: #9db0a5;
+  font-size: 11px;
+  letter-spacing: 0.16em;
+}
+
+.quiz-option__mark {
+  margin-left: auto;
+  padding-left: 8px;
+  font-size: 15px;
+}
+
+.quiz-option.is-correct {
+  border-color: #74d990;
+  background: #eaf7ef;
+}
+
+.quiz-option.is-correct .quiz-option__letter {
+  border-color: #0b6b41;
+  background: #0b6b41;
+  color: #fff;
+}
+
+.quiz-option.is-correct .quiz-option__mark {
+  color: #0b6b41;
+}
+
+.quiz-option.is-wrong {
+  border-color: #efb0b0;
+  background: #fdf0f0;
+}
+
+.quiz-option.is-wrong .quiz-option__letter {
+  border-color: #c96a6a;
+  background: #c96a6a;
+  color: #fff;
+}
+
+.quiz-option.is-wrong .quiz-option__pinyin,
+.quiz-option.is-wrong .quiz-option__mark {
+  color: #a84545;
+}
+
+/* The tones the learner did not pick fade back once the answer is in. */
+.quiz-option.is-muted {
+  opacity: 0.45;
+}
+
+.quiz-card__foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-top: 18px;
+  padding-top: 16px;
+  border-top: 1px solid #eef3ef;
+}
+
+.quiz-note {
+  color: #7e8c84;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.quiz-note.is-right {
+  color: #0b6b41;
+}
+
+.quiz-note.is-wrong {
+  color: #a84545;
+}
+
+.quiz-note__error {
+  color: #a84545;
+}
+
+.quiz-next {
+  flex: none;
+  padding: 9px 22px;
+  border: 0;
+  border-radius: 999px;
+  background: #0b6b41;
+  color: #fff;
+  font: inherit;
+  font-size: 14px;
+  letter-spacing: 0.08em;
+  cursor: pointer;
+  transition:
+    background-color 0.15s ease-in,
+    transform 0.15s ease-in;
+}
+
+.quiz-next:not(:disabled):hover {
+  background: #095c37;
+  transform: translateY(-1px);
+}
+
+.quiz-next:disabled {
+  background: #cfe0d6;
+  cursor: default;
+}
+
+.quiz-card--result {
+  padding-top: 34px;
+  padding-bottom: 30px;
+  text-align: center;
+}
+
+.quiz-result__label {
+  color: #9db0a5;
+  font-size: 11px;
+  letter-spacing: 0.3em;
+}
+
+.quiz-result__score {
+  margin-top: 10px;
+  color: #0b6b41;
+  font-size: 64px;
+  font-weight: 300;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+
+.quiz-result__of {
+  color: #b3c3ba;
+  font-size: 22px;
+}
+
+.quiz-result__line {
+  margin-top: 14px;
+  color: #7e8c84;
+  font-size: 14px;
+  line-height: 1.7;
+}
+
+.quiz-result__actions {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  margin-top: 24px;
+}
+
+.quiz-footer {
+  padding: 18px 0 22px;
+  border-top: 1px solid rgb(11 107 65 / 0.12);
+  color: #9db0a5;
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-align: center;
+}
+
+/* Click-through overlay for the confetti burst. */
+.confetti {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+/* Entry point on the chart page, sitting after the title. */
+.quiz-cta {
+  flex: none;
+  padding: 6px 17px;
+  border: 1px solid #74d990;
+  border-radius: 999px;
+  background: #f2faf5;
+  color: #0b6b41;
+  font: inherit;
+  font-size: 14px;
+  letter-spacing: 0.1em;
+  cursor: pointer;
+  transition:
+    background-color 0.15s ease-in,
+    border-color 0.15s ease-in,
+    transform 0.15s ease-in;
+}
+
+.quiz-cta:hover {
+  border-color: #0b6b41;
+  background: #e3f5ea;
+  transform: translateY(-1px);
+}
+
+/* ---------------------------------------------------------------------------
+   Quiz on a phone. The whole card has to land on one screen: at 390×844 the
+   four stacked options were 366px on their own, pushing the card 120px past the
+   fold — and 300px on a 667px iPhone SE. The options go two-up and every
+   vertical gap tightens. Measured result: ~535px of content, no scrolling.
+--------------------------------------------------------------------------- */
+@media (max-width: 560px) {
+  .quiz-topbar {
+    gap: 8px;
+    padding: 10px 12px;
+  }
+
+  .quiz-topbar__title {
+    display: none;
+  }
+
+  .quiz-stage {
+    padding: 12px 12px 14px;
+  }
+
+  .quiz-card {
+    padding: 16px 14px 14px;
+    border-radius: 14px;
+  }
+
+  .quiz-card__head {
+    padding-bottom: 8px;
+  }
+
+  .quiz-meta__label {
+    font-size: 10px;
+    letter-spacing: 0.14em;
+  }
+
+  .quiz-meta__value {
+    font-size: 17px;
+  }
+
+  .quiz-progress {
+    margin-top: 10px;
+  }
+
+  .quiz-question {
+    margin-top: 12px;
+    padding: 14px 12px 12px;
+  }
+
+  .quiz-question__label {
+    font-size: 10px;
+  }
+
+  .quiz-question__pinyin {
+    margin-top: 4px;
+    font-size: 40px;
+  }
+
+  .quiz-question__word {
+    margin-top: 2px;
+    font-size: 18px;
+  }
+
+  .quiz-question__retry {
+    margin-top: 8px;
+  }
+
+  .quiz-replay {
+    margin-top: 10px;
+    padding: 5px 13px;
+    font-size: 12px;
+  }
+
+  .quiz-options {
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    margin-top: 12px;
+  }
+
+  .quiz-option {
+    gap: 8px;
+    padding: 9px 10px;
+  }
+
+  .quiz-option__letter {
+    width: 22px;
+    height: 22px;
+    font-size: 11px;
+  }
+
+  .quiz-option__pinyin {
+    font-size: 19px;
+  }
+
+  .quiz-option__tone {
+    font-size: 10px;
+    letter-spacing: 0.06em;
+  }
+
+  .quiz-card__foot {
+    flex-direction: column;
+    gap: 8px;
+    margin-top: 12px;
+    padding-top: 10px;
+  }
+
+  .quiz-note {
+    font-size: 12px;
+  }
+
+  .quiz-next {
+    width: 100%;
+    padding: 8px 18px;
+  }
+
+  .quiz-card--result {
+    padding-top: 22px;
+    padding-bottom: 18px;
+  }
+
+  .quiz-result__score {
+    font-size: 52px;
+  }
+
+  .quiz-result__line {
+    margin-top: 10px;
+    font-size: 13px;
+  }
+
+  .quiz-result__actions {
+    margin-top: 18px;
+  }
+
+  .quiz-footer {
+    padding: 8px 0 10px;
+    font-size: 11px;
+  }
+}

@@ -1,0 +1,95 @@
+# 拼音学习图 —— 远程服务器部署（Docker Compose）
+#
+# 拓扑与 panel-roomly 一致：应用容器同时接入 default（不需要别的服务，留着方便
+# 以后加）与外部网络 caddy_net，由已有的 Caddy 容器按服务名反代；宿主机只把端口
+# 绑到 127.0.0.1 用于排障，不对外暴露。
+#
+# ── 首次部署 ────────────────────────────────────────────────────────────────
+#
+#   # 1. 外部网络（已存在则忽略）
+#   docker network inspect caddy_net >/dev/null 2>&1 || docker network create caddy_net
+#
+#   # 2. 数据目录。容器以 uid 1001 运行，宿主机目录必须交给它，否则启动即失败。
+#   mkdir -p /www/my_project/pinyin/quiz
+#   chown -R 1001:1001 /www/my_project/pinyin/quiz
+#
+#   # 3. 环境变量
+#   cp .env.example .env
+#
+#   # 4. 构建并启动
+#   docker compose up -d --build
+#   docker compose ps
+#   docker compose logs -f pinyin-app
+#
+# ── 只有一个容器 ────────────────────────────────────────────────────────────
+#
+# panel-roomly 要三个（postgres + redis + app），这边只需要一个：题库是
+# node:sqlite（Node 24 内置，无依赖），词表/读音是构建期生成好的静态文件，
+# 音频是 public/audio 直接由服务端发。没有任何外部状态服务。
+#
+# ── 命名为什么是 pinyin-app ─────────────────────────────────────────────────
+#
+# 不能叫 app。Compose 会把「service 名」当成容器的网络别名注册到它接入的每个
+# 网络上，而 caddy_net 是 panel-roomly 与本项目共用的外部网络，那边也有一个
+# service 叫 app —— 两个同名别名会让 Docker DNS 在 caddy_net 上为 app 返回两个
+# IP，Caddy 反代时可能把请求轮询到隔壁项目。别名只能加不能删，所以 service 名
+# 本身必须唯一：pinyin-app。
+#
+# ── Caddy 配置 ──────────────────────────────────────────────────────────────
+#
+# 在 Caddy 的 Caddyfile 中追加（域名按实际修改）：
+#
+#   pinyin.example.com {
+#       encode zstd gzip
+#       reverse_proxy pinyin-app:3000
+#   }
+#
+# 然后格式化并热重载：
+#
+#   docker exec -w /etc/caddy caddy-pod caddy fmt --overwrite
+#   docker exec -w /etc/caddy caddy-pod caddy reload
+#
+# ── 日常更新 ────────────────────────────────────────────────────────────────
+#
+#   git pull && docker compose up -d --build pinyin-app
+#
+# ── 说明 ────────────────────────────────────────────────────────────────────
+#
+# 容器内固定监听 3000（见 Dockerfile 的 ENV PORT），改动端口要同时改这里的
+# ports 映射与 healthcheck。题库历史存于挂载卷，重建镜像不会丢错题记录。
+
+name: pinyin
+
+services:
+  pinyin-app:
+    # 显式钉死镜像名。否则 Compose 按「目录名-service」拼，换目录名就会多出一个
+    # 孤儿镜像。
+    image: pinyin-app:latest
+    container_name: pinyin-app
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    ports:
+      # 只绑本机：供宿主机上的 Caddy/Nginx 反代，或 curl 127.0.0.1 排障。
+      - "127.0.0.1:${APP_PORT:-3100}:3000"
+    volumes:
+      # quiz.db 必须持久化，否则每次重建镜像都会清空错题记录。
+      - ${DATA_HOST_PATH:-./docker-data/quiz}:/app/data
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - "fetch('http://127.0.0.1:3000/api/health').then(r=>r.json()).then(j=>process.exit(j.ok?0:1)).catch(()=>process.exit(1))"
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    networks:
+      - default
+      - caddy_net
+
+networks:
+  caddy_net:
+    external: true

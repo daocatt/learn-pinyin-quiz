@@ -1,0 +1,35 @@
+node_modules
+dist
+*.log
+
+# 运行期状态。data/ 下的语料是要提交的，只忽略这个 SQLite 题库文件
+# （连同 journal / WAL 边车文件一起）。
+data/quiz.db
+data/quiz.db-journal
+data/quiz.db-wal
+data/quiz.db-shm
+
+# docker-compose.yml 里 DATA_HOST_PATH 的默认值。
+docker-data
+
+# 环境变量（.env.example 是模板，要提交）与打包产物。
+.env
+*.zip
+
+# Python 生成器的缓存。
+__pycache__/
+*.pyc
+
+# 两套端到端测试跑完会把截图写在当前目录，方便出问题时肉眼比对。
+# 列出确切文件名而不是 *.png，免得以后想给 README 加截图时被静默忽略。
+mine_top.png
+mine_player.png
+mine_scrolled.png
+quiz_cta.png
+quiz_card.png
+quiz_answered.png
+quiz_result.png
+quiz_confetti.png
+quiz_narrow.png
+
+.DS_Store

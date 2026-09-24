@@ -1,0 +1,20 @@
+# 镜像里会重新安装。
+node_modules
+
+# 镜像里会重新构建。
+dist
+
+# 运行期状态。quiz.db 由挂载卷提供，宿主机的历史库不该烤进镜像。
+data
+docker-data
+
+# 本地开发残留。
+__pycache__
+*.log
+*.png
+.DS_Store
+.git
+.gitignore
+
+# 绝不把环境变量带进镜像（.env.example 也一并排除，构建期用不到）。
+.env*
