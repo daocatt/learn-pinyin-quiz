@@ -1,4 +1,4 @@
-# learn-pinyin-quiz
+# Chinese Pinyin Study & Quiz
 
 An interactive web app to learn and test Mandarin Chinese Pinyin, tones, and pronunciation through customized quizzes.
 

@@ -1,4 +1,4 @@
-# learn-pinyin-quiz
+# Chinese Pinyin Study & Quiz
 
 一个交互式网页应用，通过定制测验学习和测试汉语拼音、声调与发音。
 
