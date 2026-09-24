@@ -29,6 +29,8 @@
   ——这既保证了卡片上的拼音和音频一致，也意味着这个组词可以靠拼接单音节录音播放。
 - **答错的题会回来。** 下一轮会把上一轮做错的题折进来并标记为「重做」，重做答对时
   会放彩纸。
+- **历史按浏览器隔离。** 每个访客会拿到一个不透明的 cookie，所以多人共用一个部署时，
+  你的「重做」列表就是你自己的——没人会继承你的错题，也没人看得到、改得了你的回合。
 - 卡片布局**在手机上一屏放得下、不需要滚动**（在 360×740 到 430×932 之间都验过）。
 
 ## 快速开始
@@ -58,13 +60,14 @@ npm run typecheck   # tsc --noEmit
 
 ## 测试
 
-两套端到端测试通过 DevTools Protocol 驱动真实的 Chrome，都需要先有一个服务在跑。
+共三套。其中两套通过 DevTools Protocol 驱动真实的 Chrome；三套都需要先有一个服务在跑。
 
 ```bash
 npm run dev            # 终端 1
 
 node test.mjs          # 终端 2 —— 测拼音图
 node quiz_test.mjs     #           测测验
+node session_test.mjs  #           测两个浏览器之间是否互不干扰
 ```
 
 ```bash
@@ -72,12 +75,15 @@ node quiz_test.mjs     #           测测验
 npm start
 URL=http://localhost:3100/ node test.mjs
 BASE=http://localhost:3100 node quiz_test.mjs
+BASE=http://localhost:3100 node session_test.mjs
 ```
 
 `quiz_test.mjs` 从 `data/quiz.db`（也就是服务端写的那同一个文件）里读正确答案，
 而不是相信页面——这样就算代码有 bug，也不可能因为「自说自话」而蒙混过关。
 `test.mjs` 校验的是真实几何：单元格对齐、滚动与缩放时气泡的锚定位置，以及用
-`Range` 中点量出来的字形居中。
+`Range` 中点量出来的字形居中。`session_test.mjs` 不需要浏览器：它用两个 cookie jar
+分别发请求，断言一个人的错题绝不会变成另一个人的重做，并且谁也改不了、看不到
+对方的回合。
 
 ## Docker
 

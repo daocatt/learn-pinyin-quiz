@@ -26,12 +26,19 @@ const RETRY_MAX = 8
 
 let handle: DatabaseSync | undefined
 
+/**
+ * Rounds are scoped to a browser session so that several people can use one
+ * deployment without sharing a mistake pool. `session` is nullable because it
+ * was added after the table existed — rows from before it carry NULL and simply
+ * belong to nobody, so they never show up in anyone's history.
+ */
 function database(): DatabaseSync {
   if (handle) return handle
-  handle = new DatabaseSync(DB_PATH)
-  handle.exec(`
+  const db = new DatabaseSync(DB_PATH)
+  db.exec(`
     CREATE TABLE IF NOT EXISTS rounds (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
+      session TEXT,
       created_at TEXT NOT NULL
     );
     CREATE TABLE IF NOT EXISTS questions (
@@ -46,6 +53,21 @@ function database(): DatabaseSync {
     );
     CREATE INDEX IF NOT EXISTS questions_item ON questions(item);
   `)
+
+  // `CREATE TABLE IF NOT EXISTS` is a no-op on a database that predates the
+  // column, so add it explicitly — and before the index that names it, or the
+  // index creation fails with "no such column: session". SQLite cannot add a
+  // NOT NULL column without a default, hence the nullable column above.
+  const columns = db.prepare('PRAGMA table_info(rounds)').all() as { name: string }[]
+  if (!columns.some((column) => column.name === 'session')) {
+    db.exec('ALTER TABLE rounds ADD COLUMN session TEXT')
+  }
+  db.exec('CREATE INDEX IF NOT EXISTS rounds_session ON rounds(session)')
+
+  // Only publish the handle once setup has actually finished. Assigning it first
+  // would leave a half-migrated singleton behind, and every later request would
+  // skip the migration and fail on the missing column instead.
+  handle = db
   return handle
 }
 
@@ -74,20 +96,25 @@ function question(item: QuizItem, id: number, isRetry: boolean): QuizQuestion {
 }
 
 /**
- * Start a round: up to RETRY_MAX items missed earlier and not yet redeemed, plus
- * enough fresh items to fill it. Fresh items are drawn from what the previous
- * round did not ask about, so two consecutive rounds cannot overlap — except for
- * the retries, which are carried over on purpose. The whole set is then shuffled
- * so the retries are not always the first questions.
+ * Start a round for one session: up to RETRY_MAX items that session missed
+ * earlier and has not yet redeemed, plus enough fresh items to fill it. Fresh
+ * items are drawn from what that session's previous round did not ask about, so
+ * two consecutive rounds cannot overlap — except for the retries, which are
+ * carried over on purpose. The whole set is then shuffled so the retries are not
+ * always the first questions.
+ *
+ * Every query here is filtered by `session`. Without that, a round would be
+ * deduplicated against whoever happened to create a round last, and the retry
+ * pool would be shared by everyone using the deployment.
  */
-export function createRound(): QuizRound {
+export function createRound(session: string): QuizRound {
   const db = database()
   const pool = quizPool()
   const byKey = new Map(pool.map((item) => [item.key, item]))
 
-  const previous = db.prepare('SELECT id FROM rounds ORDER BY id DESC LIMIT 1').get() as
-    | { id: number }
-    | undefined
+  const previous = db
+    .prepare('SELECT id FROM rounds WHERE session = ? ORDER BY id DESC LIMIT 1')
+    .get(session) as { id: number } | undefined
   const askedLastRound = new Set(
     previous
       ? (
@@ -98,18 +125,26 @@ export function createRound(): QuizRound {
       : [],
   )
 
-  // Missed at some point and never answered correctly since. Most recent first,
-  // so a round revisits whatever is freshest in the learner's memory.
+  // Missed at some point and never answered correctly since, within this
+  // session. Most recent first, so a round revisits whatever is freshest in the
+  // learner's memory.
   const missed = db
     .prepare(
-      `SELECT item, MAX(answered_at) AS missed_at
-         FROM questions
-        WHERE correct = 0
-          AND item NOT IN (SELECT item FROM questions WHERE correct = 1)
-        GROUP BY item
+      `SELECT q.item, MAX(q.answered_at) AS missed_at
+         FROM questions q
+         JOIN rounds r ON r.id = q.round_id
+        WHERE r.session = ?
+          AND q.correct = 0
+          AND q.item NOT IN (
+                SELECT q2.item
+                  FROM questions q2
+                  JOIN rounds r2 ON r2.id = q2.round_id
+                 WHERE r2.session = ? AND q2.correct = 1
+              )
+        GROUP BY q.item
         ORDER BY missed_at DESC`,
     )
-    .all() as { item: string; missed_at: string }[]
+    .all(session, session) as { item: string; missed_at: string }[]
 
   const retry = missed
     .map((row) => byKey.get(row.item))
@@ -122,8 +157,9 @@ export function createRound(): QuizRound {
   const chosen = shuffled([...retry, ...fresh.slice(0, ROUND_SIZE - retry.length)])
 
   const roundId = Number(
-    db.prepare('INSERT INTO rounds (created_at) VALUES (?)').run(new Date().toISOString())
-      .lastInsertRowid,
+    db
+      .prepare('INSERT INTO rounds (session, created_at) VALUES (?, ?)')
+      .run(session, new Date().toISOString()).lastInsertRowid,
   )
   const insert = db.prepare(
     'INSERT INTO questions (round_id, position, item, is_retry) VALUES (?, ?, ?, ?)',
@@ -150,13 +186,26 @@ function scoreOf(roundId: number): number {
 /**
  * Grade an answer. The first answer is final: re-submitting returns the stored
  * result and never scores twice, so the UI can safely retry a failed request.
- * Returns null when the question is not part of the round.
+ *
+ * Returns null when the question is not part of the round — and, because the
+ * lookup joins `rounds`, also when the round belongs to a different session.
+ * That keeps one browser from grading, or reading the score of, another's round.
  */
-export function answerQuestion(roundId: number, questionId: number, choice: number): QuizAnswer | null {
+export function answerQuestion(
+  session: string,
+  roundId: number,
+  questionId: number,
+  choice: number,
+): QuizAnswer | null {
   const db = database()
   const found = db
-    .prepare('SELECT item, is_retry, choice FROM questions WHERE id = ? AND round_id = ?')
-    .get(questionId, roundId) as
+    .prepare(
+      `SELECT q.item, q.is_retry, q.choice
+         FROM questions q
+         JOIN rounds r ON r.id = q.round_id
+        WHERE q.id = ? AND q.round_id = ? AND r.session = ?`,
+    )
+    .get(questionId, roundId, session) as
     | { item: string; is_retry: number; choice: number | null }
     | undefined
   if (!found) return null

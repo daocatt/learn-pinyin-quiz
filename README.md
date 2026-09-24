@@ -31,6 +31,9 @@ A round is **20 questions**. Each question plays a syllable twice, then a 组词
   by chaining clips, and why the pinyin on the card always matches the audio.
 - **Wrong answers come back.** The next round folds in the items you missed,
   flagged as 重做; redeeming one fires confetti.
+- **History is per browser.** Each visitor gets an opaque cookie, so on a shared
+  deployment your 重做 list is your own — nobody inherits your mistakes, and
+  nobody can read or grade your round.
 - The card is laid out to **fit a single phone screen with no scrolling**
   (verified at 360×740 up to 430×932).
 
@@ -61,7 +64,7 @@ npm run typecheck   # tsc --noEmit
 
 ## Testing
 
-Two end-to-end suites drive a real Chrome over the DevTools Protocol. Both
+Three suites. Two drive a real Chrome over the DevTools Protocol; all three
 expect a server to already be running.
 
 ```bash
@@ -69,6 +72,7 @@ npm run dev            # terminal 1
 
 node test.mjs          # terminal 2 — the chart
 node quiz_test.mjs     #              the quiz
+node session_test.mjs  #              that two browsers stay separate
 ```
 
 ```bash
@@ -76,13 +80,16 @@ node quiz_test.mjs     #              the quiz
 npm start
 URL=http://localhost:3100/ node test.mjs
 BASE=http://localhost:3100 node quiz_test.mjs
+BASE=http://localhost:3100 node session_test.mjs
 ```
 
 `quiz_test.mjs` reads the correct answer out of `data/quiz.db` — the same file
 the server writes — instead of trusting the page, so a bug can't pass by
 agreeing with itself. `test.mjs` checks real geometry: cell alignment, popup
 anchoring under scroll and resize, and glyph centring measured from `Range`
-midpoints.
+midpoints. `session_test.mjs` needs no browser: it posts as two cookie jars and
+asserts that one learner's mistakes never show up as the other's 重做, and that
+neither can grade or read the other's round.
 
 ## Docker
 

@@ -1,6 +1,7 @@
 import { readFile } from 'node:fs/promises'
 import { serveStatic } from '@hono/node-server/serve-static'
 import { Hono } from 'hono'
+import { getCookie, setCookie } from 'hono/cookie'
 import type { ViteDevServer } from 'vite'
 import { chartData } from '../shared/chart.ts'
 import { answerQuestion, createRound } from './quiz.ts'
@@ -12,7 +13,35 @@ import { answerQuestion, createRound } from './quiz.ts'
  *
  * @hono/vite-dev-server requires a default export.
  */
-export const app = new Hono()
+export const app = new Hono<{ Variables: { session: string } }>()
+
+/**
+ * Quiz history is per-browser, so several people can share one deployment
+ * without inheriting each other's mistakes. The id is opaque and carries no
+ * authority — it only groups a person's own rounds — which is why the cookie is
+ * not marked `Secure`: that would stop it working over plain http in local dev,
+ * and the value is not worth protecting from a network observer.
+ */
+const SESSION_COOKIE = 'pinyin_sid'
+const SESSION_MAX_AGE = 60 * 60 * 24 * 365
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
+
+app.use('*', async (c, next) => {
+  const existing = getCookie(c, SESSION_COOKIE)
+  // Re-mint anything that is not one of our own ids, so a hand-set cookie cannot
+  // be used to guess at, or collide with, someone else's history.
+  const session = existing && UUID.test(existing) ? existing : crypto.randomUUID()
+  if (session !== existing) {
+    setCookie(c, SESSION_COOKIE, session, {
+      path: '/',
+      httpOnly: true,
+      sameSite: 'Lax',
+      maxAge: SESSION_MAX_AGE,
+    })
+  }
+  c.set('session', session)
+  await next()
+})
 
 /**
  * This is a private study aid, not a public site. `robots.txt` only binds
@@ -33,7 +62,7 @@ app.get('/api/chart', (c) => c.json(chartData))
 app.get('/api/health', (c) => c.json({ ok: true }))
 
 /** Start a fresh round of 20 questions. */
-app.post('/api/quiz/round', (c) => c.json(createRound()))
+app.post('/api/quiz/round', (c) => c.json(createRound(c.get('session'))))
 
 /** Grade one answer. Locked after the first submission. */
 app.post('/api/quiz/answer', async (c) => {
@@ -53,7 +82,7 @@ app.post('/api/quiz/answer', async (c) => {
     return c.json({ error: 'choice must be a tone between 1 and 4' }, 400)
   }
 
-  const result = answerQuestion(roundId, questionId, choice)
+  const result = answerQuestion(c.get('session'), roundId, questionId, choice)
   if (!result) return c.json({ error: 'no such question in this round' }, 404)
   return c.json(result)
 })

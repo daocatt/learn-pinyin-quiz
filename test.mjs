@@ -21,7 +21,17 @@ async function main() {
     const m = JSON.parse(ev.data)
     if (m.id && pending.has(m.id)) { pending.get(m.id)(m.result); pending.delete(m.id) }
     if (m.method === 'Runtime.consoleAPICalled' && m.params.type === 'error') consoleErrors.push(m.params.args.map(a => a.value ?? a.description).join(' '))
-    if (m.method === 'Runtime.exceptionThrown') consoleErrors.push('EXCEPTION ' + m.params.exceptionDetails.text)
+    if (m.method === 'Runtime.exceptionThrown') {
+      // `text` alone is just "Uncaught (in promise)" for a rejection, which says
+      // nothing about the cause — the useful part is in `exception.description`
+      // (the stack) or, for a thrown non-Error, the previewed value. The source
+      // location is appended so a rare, intermittent rejection is still
+      // traceable to a file and line rather than just being reported as noise.
+      const d = m.params.exceptionDetails
+      const detail = d.exception?.description ?? d.exception?.value ?? ''
+      const where = d.url ? ` at ${d.url.replace(URL, '')}:${(d.lineNumber ?? 0) + 1}` : ''
+      consoleErrors.push(`EXCEPTION ${d.text}${detail ? ` — ${detail.split('\n')[0]}` : ''}${where}`)
+    }
   }
   await send('Runtime.enable'); await send('Page.enable')
   await send('Page.navigate', { url: URL })
