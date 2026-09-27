@@ -5,6 +5,8 @@ import { getCookie, setCookie } from 'hono/cookie'
 import type { ViteDevServer } from 'vite'
 import { chartData } from '../shared/chart.ts'
 import { answerQuestion, createRound } from './quiz.ts'
+import { getStorage } from './storage/index.ts'
+import type { D1Database } from './storage/d1.ts'
 
 /**
  * The application. It is used twice:
@@ -57,12 +59,18 @@ app.use('*', async (c, next) => {
 /** Served from `public/`, so it also needs a route in dev (see the catch-all below). */
 app.get('/robots.txt', serveStatic({ root: './public' }))
 
+
 app.get('/api/chart', (c) => c.json(chartData))
 
 app.get('/api/health', (c) => c.json({ ok: true }))
 
 /** Start a fresh round of 20 questions. */
-app.post('/api/quiz/round', (c) => c.json(createRound(c.get('session'))))
+app.post('/api/quiz/round', async (c) => {
+  const env = c.env as { DB?: D1Database } | undefined
+  const storage = await getStorage(env?.DB)
+  const round = await createRound(storage, c.get('session'))
+  return c.json(round)
+})
 
 /** Grade one answer. Locked after the first submission. */
 app.post('/api/quiz/answer', async (c) => {
@@ -82,9 +90,19 @@ app.post('/api/quiz/answer', async (c) => {
     return c.json({ error: 'choice must be a tone between 1 and 4' }, 400)
   }
 
-  const result = answerQuestion(c.get('session'), roundId, questionId, choice)
+  const env = c.env as { DB?: D1Database } | undefined
+  const storage = await getStorage(env?.DB)
+  const result = await answerQuestion(storage, c.get('session'), roundId, questionId, choice)
   if (!result) return c.json({ error: 'no such question in this round' }, 404)
   return c.json(result)
+})
+
+/** Get history of completed rounds for current session. */
+app.get('/api/quiz/history', async (c) => {
+  const env = c.env as { DB?: D1Database } | undefined
+  const storage = await getStorage(env?.DB)
+  const history = await storage.getRoundHistory(c.get('session'), 15)
+  return c.json(history)
 })
 
 /** Syllable recordings live in `public/audio` as `{syllable}{tone}.mp3`. */

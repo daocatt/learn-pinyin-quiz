@@ -3,6 +3,7 @@ import type { QuizAnswer, QuizRound } from '../../shared/quiz'
 import { formatPinyin } from '../lib/pinyin'
 import { useQuizAudio } from '../lib/quiz-audio'
 import { navigate } from '../lib/router'
+import { buildXShareUrl, getLocalHistory, saveRoundResult } from '../lib/history'
 import { Confetti } from './Confetti'
 
 /** A/B/C/D map to the four tones in order. */
@@ -108,7 +109,19 @@ export function Quiz() {
     setIndex(Math.max(0, target))
   }
 
-  const right = Object.values(answers).filter((entry) => entry.correct).length
+  useEffect(() => {
+    if (finished && round) {
+      saveRoundResult({
+        id: round.roundId,
+        score,
+        total,
+      })
+    }
+  }, [finished, round, score, total])
+
+  const percentage = Math.round((score / (total || 1)) * 100)
+  const shareUrl = buildXShareUrl({ score, total, percentage })
+  const localHistory = finished ? getLocalHistory() : []
 
   return (
     <div className="quiz-page">
@@ -140,12 +153,24 @@ export function Quiz() {
               <span className="quiz-result__of"> / {total}</span>
             </p>
             <p className="quiz-result__line">
-              答对 {right} 题，答错 {total - right} 题。
+              答对 {right} 题，答错 {total - right} 题（正确率 {percentage}%）。
               {right === total
-                ? '全部正确，声调掌握得很稳。'
-                : '答错的题目会出现在下一轮里。'}
+                ? '全部正确，声调掌握得极其扎实！'
+                : '答错的题目会自动纳入后续轮次的复习重试池。'}
             </p>
+
             <div className="quiz-result__actions">
+              <a
+                href={shareUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="quiz-share-x"
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 22.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
+                </svg>
+                分享成绩到 X
+              </a>
               <button type="button" className="quiz-next" onClick={() => void startRound()}>
                 再来一轮
               </button>
@@ -153,6 +178,27 @@ export function Quiz() {
                 返回拼音图
               </button>
             </div>
+
+            {localHistory.length > 1 && (
+              <div className="mt-8 border-t border-[#eef3ef] pt-5 text-left">
+                <p className="text-xs font-semibold tracking-wider text-[#9db0a5] uppercase">
+                  近期挑战记录（本机存储）
+                </p>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {localHistory.slice(0, 6).map((h, i) => (
+                    <span
+                      key={h.id || i}
+                      className="inline-flex items-center gap-1.5 rounded-md border border-[#e2ece5] bg-[#fbfdfc] px-2.5 py-1 text-xs text-[#2b2b2b]"
+                    >
+                      <span className="font-semibold text-[#0b6b41]">
+                        {h.score}/{h.total}
+                      </span>
+                      <span className="text-[11px] text-[#9db0a5]">{h.percentage}%</span>
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
           </section>
         ) : question ? (
           <article className="quiz-card">

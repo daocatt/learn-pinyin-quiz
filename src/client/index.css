@@ -703,9 +703,33 @@
 
 .quiz-result__actions {
   display: flex;
+  flex-wrap: wrap;
   justify-content: center;
   gap: 10px;
   margin-top: 24px;
+}
+
+.quiz-share-x {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 9px 18px;
+  border-radius: 999px;
+  background: #000;
+  color: #fff;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 500;
+  text-decoration: none;
+  cursor: pointer;
+  transition:
+    background-color 0.15s ease-in,
+    transform 0.15s ease-in;
+}
+
+.quiz-share-x:hover {
+  background: #242424;
+  transform: translateY(-1px);
 }
 
 .quiz-footer {
