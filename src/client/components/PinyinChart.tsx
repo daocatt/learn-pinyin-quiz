@@ -199,16 +199,16 @@ export function PinyinChart({ data }: { data: ChartData }) {
 
       {/* mt replaces the gap the removed 单击时 control row used to occupy. */}
       <p className="mt-[25px] text-center text-[13px] italic leading-[1.4] text-ink">
-        <b>提示：</b>
-        {'加粗音节为特殊读法，其中元音的发音与常见读法不同。对比理解：'}
+        <b>Note: </b>
+        {'Bold syllables indicate special pronunciations where the vowel sound differs from its standard reading. For comparison: '}
         <b>zi</b>
-        {' 的 i 不同于 ni，'}
+        {"'s i differs from ni, "}
         <b>yan</b>
-        {' 的 a 不同于 ban，'}
+        {"'s a differs from ban, "}
         <b>ye</b>
-        {' 的 e 不同于 de，'}
+        {"'s e differs from de, "}
         <b>yuan</b>
-        {' 的 a 不同于 duan，其余依此类推。'}
+        {"'s a differs from duan, and so on."}
       </p>
     </>
   )
