@@ -129,10 +129,10 @@ export function Quiz() {
 
       <header className="quiz-topbar">
         <button type="button" className="quiz-back" onClick={() => navigate('/')}>
-          ← 返回拼音图
+          ← Back to Chart
         </button>
         <span className="quiz-topbar__title">Listening Quiz</span>
-        <span className="quiz-topbar__meta">{total ? `共 ${total} 题` : ''}</span>
+        <span className="quiz-topbar__meta">{total ? `${total} Questions` : ''}</span>
       </header>
 
       <main className="quiz-stage">
@@ -172,10 +172,10 @@ export function Quiz() {
                 分享成绩到 X
               </a>
               <button type="button" className="quiz-next" onClick={() => void startRound()}>
-                再来一轮
+                Play Again
               </button>
               <button type="button" className="quiz-ghost" onClick={() => navigate('/')}>
-                返回拼音图
+                Back to Chart
               </button>
             </div>
 
