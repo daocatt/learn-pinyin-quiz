@@ -62,6 +62,20 @@ export class SqliteQuizStorage implements QuizStorage {
       .all(roundId) as { item: string }[]
   }
 
+  async getRecentAskedKeys(session: string, roundLimit: number = 3): Promise<string[]> {
+    const db = this.getDb()
+    const rows = db
+      .prepare(
+        `SELECT DISTINCT q.item
+           FROM questions q
+           JOIN rounds r ON r.id = q.round_id
+          WHERE r.session = ?
+            AND r.id IN (SELECT id FROM rounds WHERE session = ? ORDER BY id DESC LIMIT ?)`,
+      )
+      .all(session, session, roundLimit) as { item: string }[]
+    return rows.map((r) => r.item)
+  }
+
   async getMissedItems(session: string): Promise<{ item: string; missed_at: string }[]> {
     const db = this.getDb()
     return db

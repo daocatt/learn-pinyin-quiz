@@ -6,6 +6,7 @@ export interface QuizStorage {
   init(): Promise<void>
   getLastRound(session: string): Promise<{ id: number } | null>
   getRoundQuestions(roundId: number): Promise<{ item: string }[]>
+  getRecentAskedKeys(session: string, roundLimit?: number): Promise<string[]>
   getMissedItems(session: string): Promise<{ item: string; missed_at: string }[]>
   createRound(session: string, createdAt: string): Promise<number>
   insertQuestion(

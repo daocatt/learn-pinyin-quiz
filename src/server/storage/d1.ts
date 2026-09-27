@@ -82,6 +82,20 @@ export class D1QuizStorage implements QuizStorage {
     return res.results ?? []
   }
 
+  async getRecentAskedKeys(session: string, roundLimit: number = 3): Promise<string[]> {
+    const res = await this.d1
+      .prepare(
+        `SELECT DISTINCT q.item
+           FROM questions q
+           JOIN rounds r ON r.id = q.round_id
+          WHERE r.session = ?
+            AND r.id IN (SELECT id FROM rounds WHERE session = ? ORDER BY id DESC LIMIT ?)`,
+      )
+      .bind(session, session, roundLimit)
+      .all<{ item: string }>()
+    return (res.results ?? []).map((r) => r.item)
+  }
+
   async getMissedItems(session: string): Promise<{ item: string; missed_at: string }[]> {
     const res = await this.d1
       .prepare(

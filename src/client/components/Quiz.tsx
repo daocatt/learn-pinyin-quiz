@@ -300,7 +300,7 @@ export function Quiz() {
                 }`}
               >
                 {!answered
-                  ? 'Listen to the syllable twice and the word once, then choose your answer.'
+                  ? ''
                   : answered.correct
                     ? 'Correct! +1 point.'
                     : `Incorrect. Correct answer is ${TONES[answered.answer - 1].letter} · ${formatPinyin(question.syllable, answered.answer)}.`}

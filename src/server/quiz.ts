@@ -19,8 +19,9 @@ function shuffled<T>(items: readonly T[]): T[] {
   const out = [...items]
   for (let i = out.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1))
-    const swap = out[i]
-    out[j] = swap
+    const tmp = out[i]
+    out[i] = out[j]
+    out[j] = tmp
   }
   return out
 }
@@ -42,62 +43,67 @@ export async function createRound(storage: QuizStorage, session: string): Promis
   const pool = quizPool()
   const byKey = new Map(pool.map((item) => [item.key, item]))
 
-  const previous = await storage.getLastRound(session)
-  const askedLastRound = new Set(
-    previous ? (await storage.getRoundQuestions(previous.id)).map((row) => row.item) : [],
-  )
-
+  // Avoid items asked in recent rounds (last 2-3 rounds) for high freshness
+  const recentAskedKeys = new Set(await storage.getRecentAskedKeys(session, 3))
   const missed = await storage.getMissedItems(session)
 
-  // 1. Pick retry items (ensuring distinct syllables)
-  const retry: QuizItem[] = []
-  const usedSyllables = new Set<string>()
+  // Track key uniqueness (strictly 1 key per round) and syllable frequency (max 2 per syllable)
   const usedKeys = new Set<string>()
+  const syllableCounts = new Map<string, number>()
 
+  const canAdd = (item: QuizItem): boolean => {
+    if (usedKeys.has(item.key)) return false
+    const count = syllableCounts.get(item.syllable) ?? 0
+    return count < 2
+  }
+
+  const add = (item: QuizItem): void => {
+    usedKeys.add(item.key)
+    syllableCounts.set(item.syllable, (syllableCounts.get(item.syllable) ?? 0) + 1)
+  }
+
+  // 1. Pick retry items (missed previously)
+  const retry: QuizItem[] = []
   for (const row of missed) {
     const item = byKey.get(row.item)
     if (!item) continue
-    if (usedSyllables.has(item.syllable)) continue
+    if (!canAdd(item)) continue
     retry.push(item)
-    usedSyllables.add(item.syllable)
-    usedKeys.add(item.key)
+    add(item)
     if (retry.length >= RETRY_MAX) break
   }
 
-  // 2. Pick 2-3 fun / tongue-twisting challenge words (with distinct syllables)
+  // 2. Pick 2-3 fun / tongue-twisting challenge words
   const funSelected: QuizItem[] = []
   const funCandidates = shuffled(pool.filter((i) => i.isFun && !usedKeys.has(i.key)))
   for (const item of funCandidates) {
-    if (usedSyllables.has(item.syllable)) continue
+    if (!canAdd(item)) continue
     funSelected.push(item)
-    usedSyllables.add(item.syllable)
-    usedKeys.add(item.key)
+    add(item)
     if (funSelected.length >= 3 || retry.length + funSelected.length >= ROUND_SIZE) break
   }
 
-  // 3. Fill the remaining spots with fresh items (distinct syllables, avoid last round)
-  const freshCandidates = shuffled(
-    pool.filter(
-      (item) => !usedKeys.has(item.key) && !askedLastRound.has(item.key),
-    ),
+  // 3. Fill the remaining spots with fresh items (preferring items not asked recently)
+  const unaskedFresh = shuffled(
+    pool.filter((item) => !usedKeys.has(item.key) && !recentAskedKeys.has(item.key)),
   )
 
   const fresh: QuizItem[] = []
   const neededFreshCount = ROUND_SIZE - (retry.length + funSelected.length)
-  for (const item of freshCandidates) {
-    if (usedSyllables.has(item.syllable)) continue
+  for (const item of unaskedFresh) {
+    if (!canAdd(item)) continue
     fresh.push(item)
-    usedSyllables.add(item.syllable)
-    usedKeys.add(item.key)
+    add(item)
     if (fresh.length >= neededFreshCount) break
   }
 
-  // Safety fallback: if pool somehow doesn't have enough unique syllables, fill up to ROUND_SIZE
+  // If still need items, fall back to any eligible items in pool
   if (retry.length + funSelected.length + fresh.length < ROUND_SIZE) {
-    for (const item of freshCandidates) {
-      if (usedKeys.has(item.key)) continue
+    const fallbackCandidates = shuffled(pool.filter((item) => !usedKeys.has(item.key)))
+    for (const item of fallbackCandidates) {
+      if (!canAdd(item)) continue
       fresh.push(item)
-      usedKeys.add(item.key)
+      add(item)
       if (retry.length + funSelected.length + fresh.length >= ROUND_SIZE) break
     }
   }
