@@ -317,7 +317,7 @@ export function Quiz() {
         ) : null}
       </main>
 
-      <footer className="quiz-footer">ivy 拼音学习图</footer>
+      <footer className="quiz-footer">Chinese Pinyin Quiz</footer>
     </div>
   )
 }

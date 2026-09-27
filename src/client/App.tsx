@@ -70,7 +70,7 @@ function ChartPage() {
       </main>
 
       <footer className="border-t border-[#ddd] py-8 text-center text-[13px] text-muted">
-        ivy 拼音学习图
+        Chinese Pinyin Quiz
       </footer>
     </div>
   )
