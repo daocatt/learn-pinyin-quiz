@@ -36,9 +36,16 @@ function ChartPage() {
           {/* Title header */}
           <div className="mx-auto w-full max-w-[969px] px-4 sm:px-0">
             <div className="mb-4 md:mb-5 flex items-center justify-between md:justify-center gap-4">
-              <h1 className="text-left md:text-center text-2xl md:text-[38px] font-light leading-[1.4] text-brand">
-                Pinyin Quiz
-              </h1>
+              <div className="flex items-center gap-3">
+                <img
+                  src="/logo.jpg"
+                  alt="Jieba Pinyin Quiz Logo"
+                  className="h-9 w-9 rounded-lg shadow-sm border border-[#e2ece5] object-cover"
+                />
+                <h1 className="text-left md:text-center text-2xl md:text-[38px] font-light leading-[1.4] text-brand">
+                  Jieba Pinyin Quiz
+                </h1>
+              </div>
               <button type="button" className="quiz-cta" onClick={() => navigate('/quiz')}>
                 Listening Quiz
               </button>
@@ -69,8 +76,22 @@ function ChartPage() {
         </section>
       </main>
 
-      <footer className="border-t border-[#ddd] py-8 text-center text-[13px] text-muted">
-        Chinese Pinyin Quiz
+      <footer className="border-t border-[#ddd] py-10 text-center text-[13px] text-muted">
+        <div className="mx-auto flex flex-col items-center justify-center gap-3">
+          <div className="flex items-center gap-2.5">
+            <img
+              src="/logo.jpg"
+              alt="Jieba Logo"
+              className="h-7 w-7 rounded-md border border-[#e5eae7] shadow-sm object-cover"
+            />
+            <span className="font-medium text-[#111] text-[15px]">Jieba Pinyin Quiz</span>
+          </div>
+          <p className="max-w-md text-xs text-[#7e8c84] leading-relaxed">
+            No more stuttering in Chinese. Say goodbye to &quot;Jieba&quot;. Speak Chinese with flow.
+            <br />
+            <span className="text-[#0b6b41] font-medium">From stuttering to fluent: Master Pinyin first.</span>
+          </p>
+        </div>
       </footer>
     </div>
   )

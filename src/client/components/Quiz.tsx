@@ -321,7 +321,10 @@ export function Quiz() {
         ) : null}
       </main>
 
-      <footer className="quiz-footer">Chinese Pinyin Quiz</footer>
+      <footer className="quiz-footer flex items-center justify-center gap-2">
+        <img src="/logo.jpg" alt="Logo" className="w-4 h-4 rounded object-cover" />
+        <span>Jieba Pinyin Quiz</span>
+      </footer>
     </div>
   )
 }
