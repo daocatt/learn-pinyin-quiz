@@ -86,8 +86,8 @@ app.post('/api/quiz/answer', async (c) => {
   if (!Number.isInteger(roundId) || !Number.isInteger(questionId) || !Number.isInteger(choice)) {
     return c.json({ error: 'roundId, questionId and choice must be integers' }, 400)
   }
-  if (choice < 1 || choice > 4) {
-    return c.json({ error: 'choice must be a tone between 1 and 4' }, 400)
+  if (choice < 0 || choice > 4) {
+    return c.json({ error: 'choice must be a tone between 1 and 4, or 0 for timeout' }, 400)
   }
 
   const env = c.env as { DB?: D1Database } | undefined

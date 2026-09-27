@@ -77,37 +77,84 @@ export function Quiz() {
     if (finished) stop()
   }, [finished, stop])
 
-  const choose = async (choice: number) => {
-    if (!round || !question || answered || busy) return
-    setBusy(true)
-    setError(null)
-    try {
-      const response = await fetch('/api/quiz/answer', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ roundId: round.roundId, questionId: question.id, choice }),
-      })
-      if (!response.ok) throw new Error(`HTTP ${response.status}`)
-      const result = (await response.json()) as QuizAnswer
-      setAnswers((prev) => ({ ...prev, [question.id]: { choice, ...result } }))
-      setScore(result.score)
-      // A previously-missed item redeemed — celebrate it.
-      if (result.correct && result.isRetry) setBurst((n) => n + 1)
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : String(cause))
-    } finally {
-      setBusy(false)
-    }
-  }
+  const [timeLeft, setTimeLeft] = useState(10)
+  const timerRef = useRef<NodeJS.Timeout | null>(null)
 
-  const goTo = (target: number) => {
-    if (!round) return
-    if (target >= round.questions.length) {
-      setFinished(true)
-      return
+  const goTo = useCallback(
+    (target: number) => {
+      if (!round) return
+      if (target >= round.questions.length) {
+        setFinished(true)
+        return
+      }
+      setIndex(Math.max(0, target))
+    },
+    [round],
+  )
+
+  const choose = useCallback(
+    async (choice: number) => {
+      if (!round || !question || answered || busy) return
+      setBusy(true)
+      setError(null)
+      try {
+        const response = await fetch('/api/quiz/answer', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ roundId: round.roundId, questionId: question.id, choice }),
+        })
+        if (!response.ok) throw new Error(`HTTP ${response.status}`)
+        const result = (await response.json()) as QuizAnswer
+        setAnswers((prev) => ({ ...prev, [question.id]: { choice, ...result } }))
+        setScore(result.score)
+        // A previously-missed item redeemed — celebrate it.
+        if (result.correct && result.isRetry) setBurst((n) => n + 1)
+
+        // Accelerate timer after user answered: if remaining time > 3s, shrink to 3s
+        setTimeLeft((prev) => (prev > 3 ? 3 : prev))
+      } catch (cause) {
+        setError(cause instanceof Error ? cause.message : String(cause))
+      } finally {
+        setBusy(false)
+      }
+    },
+    [round, question, answered, busy],
+  )
+
+  // Reset timer on new question
+  useEffect(() => {
+    if (!finished && question && !answered) {
+      setTimeLeft(10)
     }
-    setIndex(Math.max(0, target))
-  }
+  }, [index, question, finished, answered])
+
+  // Timer interval countdown
+  useEffect(() => {
+    if (finished || !question || busy) return
+
+    timerRef.current = setInterval(() => {
+      setTimeLeft((prev) => {
+        if (prev <= 1) {
+          // Timer reached 0
+          if (!answered) {
+            // Timed out: mark as wrong answer (choice: 0)
+            void choose(0)
+            // Wait 2s to show correct answer before advancing
+            return 2
+          } else {
+            // Already answered and countdown finished: advance to next question
+            goTo(index + 1)
+            return 10
+          }
+        }
+        return prev - 1
+      })
+    }, 1000)
+
+    return () => {
+      if (timerRef.current) clearInterval(timerRef.current)
+    }
+  }, [index, finished, question, answered, busy, choose, goTo])
 
   const right = Object.values(answers).filter((entry) => entry.correct).length
 
@@ -219,10 +266,22 @@ export function Quiz() {
                   </span>
                 )}
               </div>
-              <span className="quiz-meta quiz-meta--end">
-                <span className="quiz-meta__label">Score</span>
-                <span className="quiz-meta__value">{score}</span>
-              </span>
+              <div className="flex items-center gap-4">
+                <span
+                  className={`inline-flex items-center gap-1 font-mono text-xs font-semibold px-2 py-0.5 rounded-md border transition-colors ${
+                    timeLeft <= 3
+                      ? 'bg-[#fef2f2] text-[#dc2626] border-[#fecaca] animate-pulse'
+                      : 'bg-[#f4f7f5] text-[#0b6b41] border-[#d8e7de]'
+                  }`}
+                  title="Time Remaining"
+                >
+                  ⏱ {timeLeft}s
+                </span>
+                <span className="quiz-meta quiz-meta--end">
+                  <span className="quiz-meta__label">Score</span>
+                  <span className="quiz-meta__value">{score}</span>
+                </span>
+              </div>
             </header>
 
             <ol className="quiz-progress">
@@ -305,7 +364,9 @@ export function Quiz() {
                   ? ''
                   : answered.correct
                     ? 'Correct! +1 point.'
-                    : `Incorrect. Correct answer is ${TONES[answered.answer - 1].letter} · ${formatPinyin(question.syllable, answered.answer)}.`}
+                    : answered.choice === 0
+                      ? `Time's up! Correct answer is ${TONES[answered.answer - 1].letter} · ${formatPinyin(question.syllable, answered.answer)}.`
+                      : `Incorrect. Correct answer is ${TONES[answered.answer - 1].letter} · ${formatPinyin(question.syllable, answered.answer)}.`}
                 {error && <span className="quiz-note__error">({error})</span>}
               </p>
               <button
@@ -314,7 +375,9 @@ export function Quiz() {
                 disabled={!answered}
                 onClick={() => goTo(index + 1)}
               >
-                {isLast ? 'View Results' : 'Next Question'}
+                {isLast
+                  ? `View Results (${timeLeft}s)`
+                  : `Next Question (${timeLeft}s)`}
               </button>
             </footer>
           </article>
