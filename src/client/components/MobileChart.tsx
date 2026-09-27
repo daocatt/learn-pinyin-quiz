@@ -74,12 +74,12 @@ export function MobileChart({ data }: MobileChartProps) {
 
   return (
     <div className="w-full pb-16">
-      {/* 1. Mobile Initial Picker (Horizontal scroll) */}
+      {/* 1. Mobile Initial Picker (2 Rows Grid) */}
       <div className="sticky top-0 z-20 bg-white/95 backdrop-blur-md border-b border-[#e5eee8] px-3 py-2.5">
-        <div className="text-[11px] font-semibold text-[#7e8c84] mb-1.5 px-1 tracking-wider uppercase">
-          选择声母（滑动切换）
+        <div className="text-[11px] font-semibold text-[#7e8c84] mb-2 px-0.5 tracking-wider uppercase">
+          Select Initial
         </div>
-        <div className="flex gap-1.5 overflow-x-auto no-scrollbar py-1 scroll-smooth">
+        <div className="grid grid-flow-col grid-rows-2 gap-1.5 overflow-x-auto no-scrollbar py-0.5">
           {initials.map((init) => {
             const isSelected = init === selectedInitial
             return (
@@ -90,9 +90,9 @@ export function MobileChart({ data }: MobileChartProps) {
                   setSelectedInitial(init)
                   setActiveSyllable(null)
                 }}
-                className={`flex-none px-3.5 py-1.5 rounded-lg text-sm font-semibold transition-all ${
+                className={`min-w-[42px] px-2.5 py-1.5 rounded-lg text-sm font-semibold text-center transition-all ${
                   isSelected
-                    ? 'bg-[#0b6b41] text-white shadow-sm shadow-[#0b6b41]/30 scale-105'
+                    ? 'bg-[#0b6b41] text-white shadow-sm shadow-[#0b6b41]/30 scale-102'
                     : 'bg-[#f4f8f5] text-[#2b2b2b] hover:bg-[#eaf4ed] active:scale-95'
                 }`}
               >
