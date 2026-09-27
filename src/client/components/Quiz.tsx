@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { QuizAnswer, QuizRound } from '../../shared/quiz'
 import { formatPinyin } from '../lib/pinyin'
-import { useQuizAudio } from '../lib/quiz-audio'
+import { useQuizAudio, unlockAudio } from '../lib/quiz-audio'
 import { navigate } from '../lib/router'
 import { buildXShareUrl, getLocalHistory, saveRoundResult } from '../lib/history'
 import { Confetti } from './Confetti'
@@ -220,7 +220,14 @@ export function Quiz() {
                 </svg>
                 Share on X
               </a>
-              <button type="button" className="quiz-next" onClick={() => void startRound()}>
+              <button
+                type="button"
+                className="quiz-next"
+                onClick={() => {
+                  unlockAudio()
+                  void startRound()
+                }}
+              >
                 Play Again
               </button>
               <button type="button" className="quiz-ghost" onClick={() => navigate('/')}>
@@ -262,7 +269,7 @@ export function Quiz() {
                 </span>
                 {question.isFun && !question.isRetry && (
                   <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-[#fef3c7] text-[#92400e] border border-[#fde68a]">
-                    ✨ Fun Challenge
+                    ✨ Challenge
                   </span>
                 )}
               </div>

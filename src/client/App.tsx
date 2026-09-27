@@ -4,6 +4,7 @@ import { PinyinChart } from './components/PinyinChart'
 import { MobileChart } from './components/MobileChart'
 import { Quiz } from './components/Quiz'
 import { navigate, usePathname } from './lib/router'
+import { unlockAudio } from './lib/quiz-audio'
 
 export default function App() {
   const path = usePathname()
@@ -46,7 +47,14 @@ function ChartPage() {
                   Jieba Pinyin Quiz
                 </h1>
               </div>
-              <button type="button" className="quiz-cta" onClick={() => navigate('/quiz')}>
+              <button
+                type="button"
+                className="quiz-cta"
+                onClick={() => {
+                  unlockAudio()
+                  navigate('/quiz')
+                }}
+              >
                 Listening Quiz
               </button>
             </div>

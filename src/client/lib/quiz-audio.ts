@@ -46,8 +46,25 @@ let context: AudioContext | undefined
 const cache = new Map<string, Promise<Clip>>()
 
 function audioContext(): AudioContext {
-  context ??= new AudioContext()
+  if (!context) {
+    const AudioContextClass =
+      window.AudioContext ||
+      (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext
+    context = new AudioContextClass()
+  }
   return context
+}
+
+/** Pre-unlock audio on user click (especially for iOS Safari) */
+export function unlockAudio(): void {
+  try {
+    const ctx = audioContext()
+    if (ctx.state === 'suspended') {
+      void ctx.resume()
+    }
+  } catch {
+    /* ignore */
+  }
 }
 
 /** Where the recording's own silence ends, and how much sound follows. */
@@ -83,14 +100,20 @@ function measure(buffer: AudioBuffer): { lead: number; voiced: number } {
   }
 }
 
-function load(url: string): Promise<Clip> {
+async function load(url: string): Promise<Clip | null> {
+  if (!url) return null
   let pending = cache.get(url)
   if (!pending) {
     pending = (async () => {
-      const response = await fetch(url)
-      const buffer = await audioContext().decodeAudioData(await response.arrayBuffer())
-      return { buffer, ...measure(buffer) }
-    })()
+      try {
+        const response = await fetch(url)
+        if (!response.ok) return null
+        const buffer = await audioContext().decodeAudioData(await response.arrayBuffer())
+        return { buffer, ...measure(buffer) }
+      } catch {
+        return null
+      }
+    })() as Promise<Clip>
     cache.set(url, pending)
     if (cache.size > CACHE_MAX) {
       const oldest = cache.keys().next().value
@@ -127,30 +150,36 @@ export function useQuizAudio() {
       const cancelled = () => token.current !== mine
       silence()
 
-      const ctx = audioContext()
-      if (ctx.state === 'suspended') await ctx.resume()
-      if (cancelled()) return
+      try {
+        const ctx = audioContext()
+        if (ctx.state === 'suspended') await ctx.resume()
+        if (cancelled()) return
 
-      const target = await load(question.audio.target)
-      const word = await Promise.all(question.audio.word.map(load))
-      if (cancelled()) return
+        const target = await load(question.audio.target)
+        const wordClips = await Promise.all(question.audio.word.map(load))
+        if (cancelled() || !target) return
 
-      // The standalone syllable twice, then the word once. Placed by each
-      // clip's measured voiced length, so the gaps are exactly the constants
-      // above rather than the recordings' own padding.
-      const queue = [target, target, ...word]
-      let at = ctx.currentTime + 0.08
-      for (let i = 0; i < queue.length; i++) {
-        const clip = queue[i]
-        const source = ctx.createBufferSource()
-        source.buffer = clip.buffer
-        source.connect(ctx.destination)
-        source.start(at, clip.lead, clip.voiced)
-        playing.current.push(source)
-        at += clip.voiced
-        // Both standalone readings, and the step into the word, get a full
-        // beat; only the word's own syllables are run together.
-        if (i < queue.length - 1) at += i < 2 ? READING_GAP : -WORD_OVERLAP
+        const validWordClips = wordClips.filter((c): c is Clip => c !== null)
+
+        // The standalone syllable twice, then the word once. Placed by each
+        // clip's measured voiced length, so the gaps are exactly the constants
+        // above rather than the recordings' own padding.
+        const queue = [target, target, ...validWordClips]
+        let at = ctx.currentTime + 0.08
+        for (let i = 0; i < queue.length; i++) {
+          const clip = queue[i]
+          const source = ctx.createBufferSource()
+          source.buffer = clip.buffer
+          source.connect(ctx.destination)
+          source.start(at, clip.lead, clip.voiced)
+          playing.current.push(source)
+          at += clip.voiced
+          // Both standalone readings, and the step into the word, get a full
+          // beat; only the word's own syllables are run together.
+          if (i < queue.length - 1) at += i < 2 ? READING_GAP : -WORD_OVERLAP
+        }
+      } catch {
+        /* safely catch audio context issues */
       }
     },
     [silence],
