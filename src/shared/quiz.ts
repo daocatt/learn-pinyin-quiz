@@ -21,6 +21,8 @@ export type QuizItem = {
   word?: string
   /** Syllable+tone keys of `word`, in order. */
   wordKeys?: string[]
+  /** True if this is a special fun / tongue-twisting challenge word */
+  isFun?: boolean
 }
 
 const KEY = /^([a-z\u00fc]+)([1-4])$/
@@ -34,6 +36,8 @@ export type QuizQuestion = {
   word?: string
   /** True when this item was answered wrongly in an earlier round. */
   isRetry: boolean
+  /** True when this item is a fun / tongue-twisting challenge */
+  isFun?: boolean
   /**
    * The recordings to play, in order: the standalone syllable twice, then the
    * word once. The URLs name the tone, so this is not a secrecy boundary — the
@@ -72,6 +76,8 @@ export function keyAudioUrl(key: string): string | null {
   return parsed ? audioUrl(parsed.syllable, parsed.tone) : null
 }
 
+import { FUN_WORDS } from './fun-words.ts'
+
 let cached: QuizItem[] | undefined
 
 /** Every item the quiz may ask about, in a stable order. */
@@ -79,11 +85,13 @@ export function quizPool(): QuizItem[] {
   cached ??= Object.keys(HANZI).flatMap((key) => {
     const parsed = parseKey(key)
     if (!parsed) return []
-    const entry = WORDS[key]
+    const funEntry = FUN_WORDS[key]
+    const entry = funEntry || WORDS[key]
     return [
       {
         key,
         ...parsed,
+        isFun: Boolean(funEntry),
         ...(entry ? { word: entry.word, wordKeys: entry.syllables } : {}),
       },
     ]

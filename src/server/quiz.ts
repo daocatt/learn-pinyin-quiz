@@ -33,6 +33,7 @@ function question(item: QuizItem, id: number, isRetry: boolean): QuizQuestion {
     syllable: item.syllable,
     ...(item.word ? { word: item.word } : {}),
     isRetry,
+    isFun: item.isFun,
     audio: { target: target ?? '', word },
   }
 }
@@ -53,10 +54,22 @@ export async function createRound(storage: QuizStorage, session: string): Promis
     .slice(0, RETRY_MAX)
   const retryKeys = new Set(retry.map((item) => item.key))
 
+  // Intentionally inject 2 to 4 fun / tongue-twisting words into the pool
+  const funCandidates = shuffled(pool.filter((i) => i.isFun && !retryKeys.has(i.key)))
+  const funSelected = funCandidates.slice(0, Math.min(3, ROUND_SIZE - retry.length))
+  const funKeys = new Set(funSelected.map((i) => i.key))
+
   const fresh = shuffled(
-    pool.filter((item) => !retryKeys.has(item.key) && !askedLastRound.has(item.key)),
+    pool.filter(
+      (item) =>
+        !retryKeys.has(item.key) &&
+        !funKeys.has(item.key) &&
+        !askedLastRound.has(item.key),
+    ),
   )
-  const chosen = shuffled([...retry, ...fresh.slice(0, ROUND_SIZE - retry.length)])
+
+  const remainingCount = ROUND_SIZE - retry.length - funSelected.length
+  const chosen = shuffled([...retry, ...funSelected, ...fresh.slice(0, remainingCount)])
 
   const roundId = await storage.createRound(session, new Date().toISOString())
 

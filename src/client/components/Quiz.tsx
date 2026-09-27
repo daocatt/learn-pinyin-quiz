@@ -245,6 +245,11 @@ export function Quiz() {
               <p className="quiz-question__pinyin">{question.syllable}</p>
               {question.word && <p className="quiz-question__word">{question.word}</p>}
               {question.isRetry && <p className="quiz-question__retry">上次答错，再考一次</p>}
+              {question.isFun && !question.isRetry && (
+                <p className="inline-block mt-2 px-2.5 py-0.5 rounded-full text-xs font-medium bg-[#fef3c7] text-[#92400e] border border-[#fde68a]">
+                  ✨ 趣味/绕口令挑战
+                </p>
+              )}
               <button
                 type="button"
                 className="quiz-replay"
