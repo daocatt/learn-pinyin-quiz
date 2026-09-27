@@ -1,0 +1,18 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "pinyin-quiz",
+  "main": "src/server/cf-worker.ts",
+  "compatibility_date": "2026-03-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "assets": {
+    "directory": "./dist/client",
+    "binding": "ASSETS"
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "pinyin-quiz-db",
+      "database_id": "YOUR_D1_DATABASE_ID_HERE"
+    }
+  ]
+}
