@@ -57,16 +57,16 @@ export function buildXShareUrl(record: {
   total: number
   percentage: number
 }): string {
-  const emoji =
+  const title =
     record.percentage === 100
-      ? '🏆 完美通关！'
+      ? '🏆 Perfect Score!'
       : record.percentage >= 80
-        ? '🎉 战绩出色！'
+        ? '🎉 Great Score!'
         : record.percentage >= 60
-          ? '💪 及格过关！'
-          : '👀 舌头打结了！'
+          ? '💪 Passed the Quiz!'
+          : '👀 Tongue Twister Challenge!'
 
-  const text = `${emoji}我在拼音听力测验中取得了 ${record.score}/${record.total} 分（正确率 ${record.percentage}%）！\n你能分清第一二三四声吗？来测测你的中文拼音听力：`
+  const text = `${title} I scored ${record.score}/${record.total} (${record.percentage}% accuracy) on Chinese Pinyin Listening Quiz!\n\nCan you tell the 4 Mandarin tones apart? Test your skills here:`
   const targetUrl = typeof window !== 'undefined' ? window.location.origin : 'https://pinyin.app'
 
   return `https://x.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(targetUrl)}`
