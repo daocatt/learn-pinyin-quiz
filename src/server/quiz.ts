@@ -48,30 +48,65 @@ export async function createRound(storage: QuizStorage, session: string): Promis
   )
 
   const missed = await storage.getMissedItems(session)
-  const retry = missed
-    .map((row) => byKey.get(row.item))
-    .filter((item): item is QuizItem => item !== undefined)
-    .slice(0, RETRY_MAX)
-  const retryKeys = new Set(retry.map((item) => item.key))
 
-  // Intentionally inject 2 to 4 fun / tongue-twisting words into the pool
-  const funCandidates = shuffled(pool.filter((i) => i.isFun && !retryKeys.has(i.key)))
-  const funSelected = funCandidates.slice(0, Math.min(3, ROUND_SIZE - retry.length))
-  const funKeys = new Set(funSelected.map((i) => i.key))
+  // 1. Pick retry items (ensuring distinct syllables)
+  const retry: QuizItem[] = []
+  const usedSyllables = new Set<string>()
+  const usedKeys = new Set<string>()
 
-  const fresh = shuffled(
+  for (const row of missed) {
+    const item = byKey.get(row.item)
+    if (!item) continue
+    if (usedSyllables.has(item.syllable)) continue
+    retry.push(item)
+    usedSyllables.add(item.syllable)
+    usedKeys.add(item.key)
+    if (retry.length >= RETRY_MAX) break
+  }
+
+  // 2. Pick 2-3 fun / tongue-twisting challenge words (with distinct syllables)
+  const funSelected: QuizItem[] = []
+  const funCandidates = shuffled(pool.filter((i) => i.isFun && !usedKeys.has(i.key)))
+  for (const item of funCandidates) {
+    if (usedSyllables.has(item.syllable)) continue
+    funSelected.push(item)
+    usedSyllables.add(item.syllable)
+    usedKeys.add(item.key)
+    if (funSelected.length >= 3 || retry.length + funSelected.length >= ROUND_SIZE) break
+  }
+
+  // 3. Fill the remaining spots with fresh items (distinct syllables, avoid last round)
+  const freshCandidates = shuffled(
     pool.filter(
-      (item) =>
-        !retryKeys.has(item.key) &&
-        !funKeys.has(item.key) &&
-        !askedLastRound.has(item.key),
+      (item) => !usedKeys.has(item.key) && !askedLastRound.has(item.key),
     ),
   )
 
-  const remainingCount = ROUND_SIZE - retry.length - funSelected.length
-  const chosen = shuffled([...retry, ...funSelected, ...fresh.slice(0, remainingCount)])
+  const fresh: QuizItem[] = []
+  const neededFreshCount = ROUND_SIZE - (retry.length + funSelected.length)
+  for (const item of freshCandidates) {
+    if (usedSyllables.has(item.syllable)) continue
+    fresh.push(item)
+    usedSyllables.add(item.syllable)
+    usedKeys.add(item.key)
+    if (fresh.length >= neededFreshCount) break
+  }
+
+  // Safety fallback: if pool somehow doesn't have enough unique syllables, fill up to ROUND_SIZE
+  if (retry.length + funSelected.length + fresh.length < ROUND_SIZE) {
+    for (const item of freshCandidates) {
+      if (usedKeys.has(item.key)) continue
+      fresh.push(item)
+      usedKeys.add(item.key)
+      if (retry.length + funSelected.length + fresh.length >= ROUND_SIZE) break
+    }
+  }
+
+  const chosen = shuffled([...retry, ...funSelected, ...fresh])
+
 
   const roundId = await storage.createRound(session, new Date().toISOString())
+  const retryKeys = new Set(retry.map((item) => item.key))
 
   const questions: QuizQuestion[] = []
   for (let position = 0; position < chosen.length; position++) {

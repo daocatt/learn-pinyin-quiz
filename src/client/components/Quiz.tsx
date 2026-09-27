@@ -109,6 +109,8 @@ export function Quiz() {
     setIndex(Math.max(0, target))
   }
 
+  const right = Object.values(answers).filter((entry) => entry.correct).length
+
   useEffect(() => {
     if (finished && round) {
       saveRoundResult({
