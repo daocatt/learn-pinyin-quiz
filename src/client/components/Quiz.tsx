@@ -205,13 +205,20 @@ export function Quiz() {
         ) : question ? (
           <article className="quiz-card">
             <header className="quiz-card__head">
-              <span className="quiz-meta">
-                <span className="quiz-meta__label">Question</span>
-                <span className="quiz-meta__value">
-                  {index + 1}
-                  <span className="quiz-meta__of"> / {total}</span>
+              <div className="flex items-center gap-3">
+                <span className="quiz-meta">
+                  <span className="quiz-meta__label">Question</span>
+                  <span className="quiz-meta__value">
+                    {index + 1}
+                    <span className="quiz-meta__of"> / {total}</span>
+                  </span>
                 </span>
-              </span>
+                {question.isFun && !question.isRetry && (
+                  <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-[#fef3c7] text-[#92400e] border border-[#fde68a]">
+                    ✨ Fun Challenge
+                  </span>
+                )}
+              </div>
               <span className="quiz-meta quiz-meta--end">
                 <span className="quiz-meta__label">Score</span>
                 <span className="quiz-meta__value">{score}</span>
@@ -247,11 +254,6 @@ export function Quiz() {
               <p className="quiz-question__pinyin">{question.syllable}</p>
               {question.word && <p className="quiz-question__word">{question.word}</p>}
               {question.isRetry && <p className="quiz-question__retry">Review Missed Question</p>}
-              {question.isFun && !question.isRetry && (
-                <p className="inline-block mt-2 px-2.5 py-0.5 rounded-full text-xs font-medium bg-[#fef3c7] text-[#92400e] border border-[#fde68a]">
-                  ✨ Fun Challenge
-                </p>
-              )}
               <button
                 type="button"
                 className="quiz-replay"
