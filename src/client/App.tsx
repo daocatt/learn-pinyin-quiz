@@ -37,7 +37,7 @@ function ChartPage() {
           <div className="mx-auto w-full max-w-[969px] px-4 sm:px-0">
             <div className="mb-4 md:mb-5 flex items-center justify-between md:justify-center gap-4">
               <h1 className="text-left md:text-center text-2xl md:text-[38px] font-light leading-[1.4] text-brand">
-                拼音学习图
+                Pinyin Quiz
               </h1>
               <button type="button" className="quiz-cta" onClick={() => navigate('/quiz')}>
                 听力测验
