@@ -1,9 +1,15 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "pinyin-quiz",
+  "name": "jieba-pinyin-quiz",
   "main": "src/server/cf-worker.ts",
   "compatibility_date": "2026-03-01",
   "compatibility_flags": ["nodejs_compat"],
+  "routes": [
+    {
+      "pattern": "jieba.cc",
+      "custom_domain": true
+    }
+  ],
   "assets": {
     "directory": "./dist/client",
     "binding": "ASSETS"
@@ -11,8 +17,8 @@
   "d1_databases": [
     {
       "binding": "DB",
-      "database_name": "pinyin-quiz-db",
-      "database_id": "YOUR_D1_DATABASE_ID_HERE"
+      "database_name": "jiaba-pinyin-db",
+      "database_id": "533c07ea-049f-4f6a-bd7b-217fede17c21"
     }
   ]
 }

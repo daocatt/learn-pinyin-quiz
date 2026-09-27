@@ -18,6 +18,11 @@ export const cfApp = new Hono<{
   Variables: { session: string }
 }>()
 
+cfApp.onError((err, c) => {
+  console.error('CF Worker Error:', err)
+  return c.json({ error: err.message, stack: err.stack }, 500)
+})
+
 const SESSION_COOKIE = 'pinyin_sid'
 const SESSION_MAX_AGE = 60 * 60 * 24 * 365
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/

@@ -67,7 +67,10 @@ export function buildXShareUrl(record: {
           : '👀 Tongue Twister Challenge!'
 
   const text = `${title} I scored ${record.score}/${record.total} (${record.percentage}% accuracy) on Chinese Pinyin Listening Quiz!\n\nCan you tell the 4 Mandarin tones apart? Test your skills here:`
-  const targetUrl = typeof window !== 'undefined' ? window.location.origin : 'https://pinyin.app'
+  const targetUrl =
+    typeof window !== 'undefined' && window.location.origin.includes('jieba.cc')
+      ? window.location.origin
+      : 'https://jieba.cc'
 
   return `https://x.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(targetUrl)}`
 }

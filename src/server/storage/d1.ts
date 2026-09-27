@@ -45,25 +45,27 @@ export class D1QuizStorage implements QuizStorage {
   }
 
   async init(): Promise<void> {
-    await this.d1.exec(`
-      CREATE TABLE IF NOT EXISTS rounds (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        session TEXT,
-        created_at TEXT NOT NULL
-      );
-      CREATE TABLE IF NOT EXISTS questions (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        round_id INTEGER NOT NULL REFERENCES rounds(id),
-        position INTEGER NOT NULL,
-        item TEXT NOT NULL,
-        is_retry INTEGER NOT NULL DEFAULT 0,
-        choice INTEGER,
-        correct INTEGER,
-        answered_at TEXT
-      );
-      CREATE INDEX IF NOT EXISTS questions_item ON questions(item);
-      CREATE INDEX IF NOT EXISTS rounds_session ON rounds(session);
-    `)
+    try {
+      await this.d1.exec(`
+        CREATE TABLE IF NOT EXISTS rounds (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          session TEXT,
+          created_at TEXT NOT NULL
+        );
+        CREATE TABLE IF NOT EXISTS questions (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          round_id INTEGER NOT NULL REFERENCES rounds(id),
+          position INTEGER NOT NULL,
+          item TEXT NOT NULL,
+          is_retry INTEGER NOT NULL DEFAULT 0,
+          choice INTEGER,
+          correct INTEGER,
+          answered_at TEXT
+        );
+      `)
+    } catch {
+      // Ignore if tables already exist
+    }
   }
 
   async getLastRound(session: string): Promise<{ id: number } | null> {
@@ -119,11 +121,11 @@ export class D1QuizStorage implements QuizStorage {
   }
 
   async createRound(session: string, createdAt: string): Promise<number> {
-    const res = await this.d1
-      .prepare('INSERT INTO rounds (session, created_at) VALUES (?, ?)')
+    const row = await this.d1
+      .prepare('INSERT INTO rounds (session, created_at) VALUES (?, ?) RETURNING id')
       .bind(session, createdAt)
-      .run()
-    return Number(res.meta.last_row_id)
+      .first<{ id: number }>()
+    return Number(row?.id)
   }
 
   async insertQuestion(
@@ -132,13 +134,13 @@ export class D1QuizStorage implements QuizStorage {
     item: string,
     isRetry: boolean,
   ): Promise<number> {
-    const res = await this.d1
+    const row = await this.d1
       .prepare(
-        'INSERT INTO questions (round_id, position, item, is_retry) VALUES (?, ?, ?, ?)',
+        'INSERT INTO questions (round_id, position, item, is_retry) VALUES (?, ?, ?, ?) RETURNING id',
       )
       .bind(roundId, position, item, isRetry ? 1 : 0)
-      .run()
-    return Number(res.meta.last_row_id)
+      .first<{ id: number }>()
+    return Number(row?.id)
   }
 
   async getQuestion(
