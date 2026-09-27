@@ -8,10 +8,10 @@ import { Confetti } from './Confetti'
 
 /** A/B/C/D map to the four tones in order. */
 const TONES = [
-  { tone: 1, letter: 'A', name: '第一声' },
-  { tone: 2, letter: 'B', name: '第二声' },
-  { tone: 3, letter: 'C', name: '第三声' },
-  { tone: 4, letter: 'D', name: '第四声' },
+  { tone: 1, letter: 'A', name: 'Tone 1' },
+  { tone: 2, letter: 'B', name: 'Tone 2' },
+  { tone: 3, letter: 'C', name: 'Tone 3' },
+  { tone: 4, letter: 'D', name: 'Tone 4' },
 ] as const
 
 type Answer = { choice: number } & QuizAnswer
@@ -147,16 +147,16 @@ export function Quiz() {
           </p>
         ) : finished ? (
           <section className="quiz-card quiz-card--result">
-            <p className="quiz-result__label">本轮成绩</p>
+            <p className="quiz-result__label">ROUND SCORE</p>
             <p className="quiz-result__score">
               {score}
               <span className="quiz-result__of"> / {total}</span>
             </p>
             <p className="quiz-result__line">
-              答对 {right} 题，答错 {total - right} 题（正确率 {percentage}%）。
+              {right} correct, {total - right} incorrect ({percentage}% accuracy).
               {right === total
-                ? '全部正确，声调掌握得极其扎实！'
-                : '答错的题目会自动纳入后续轮次的复习重试池。'}
+                ? ' Perfect score! Your tones are rock solid.'
+                : ' Missed items will be reviewed in upcoming rounds.'}
             </p>
 
             <div className="quiz-result__actions">
@@ -169,7 +169,7 @@ export function Quiz() {
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
                   <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 22.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
                 </svg>
-                分享成绩到 X
+                Share on X
               </a>
               <button type="button" className="quiz-next" onClick={() => void startRound()}>
                 Play Again
@@ -182,7 +182,7 @@ export function Quiz() {
             {localHistory.length > 1 && (
               <div className="mt-8 border-t border-[#eef3ef] pt-5 text-left">
                 <p className="text-xs font-semibold tracking-wider text-[#9db0a5] uppercase">
-                  近期挑战记录（本机存储）
+                  Recent Rounds (Local Device)
                 </p>
                 <div className="mt-3 flex flex-wrap gap-2">
                   {localHistory.slice(0, 6).map((h, i) => (
@@ -204,14 +204,14 @@ export function Quiz() {
           <article className="quiz-card">
             <header className="quiz-card__head">
               <span className="quiz-meta">
-                <span className="quiz-meta__label">题号</span>
+                <span className="quiz-meta__label">Question</span>
                 <span className="quiz-meta__value">
                   {index + 1}
                   <span className="quiz-meta__of"> / {total}</span>
                 </span>
               </span>
               <span className="quiz-meta quiz-meta--end">
-                <span className="quiz-meta__label">得分</span>
+                <span className="quiz-meta__label">Score</span>
                 <span className="quiz-meta__value">{score}</span>
               </span>
             </header>
@@ -231,8 +231,8 @@ export function Quiz() {
                     <button
                       type="button"
                       className={classes}
-                      title={`第 ${position + 1} 题`}
-                      aria-label={`第 ${position + 1} 题`}
+                      title={`Question ${position + 1}`}
+                      aria-label={`Question ${position + 1}`}
                       onClick={() => goTo(position)}
                     />
                   </li>
@@ -244,7 +244,7 @@ export function Quiz() {
               <p className="quiz-question__label">Choose the correct tone for this syllable</p>
               <p className="quiz-question__pinyin">{question.syllable}</p>
               {question.word && <p className="quiz-question__word">{question.word}</p>}
-              {question.isRetry && <p className="quiz-question__retry">上次答错，再考一次</p>}
+              {question.isRetry && <p className="quiz-question__retry">Review Missed Question</p>}
               {question.isFun && !question.isRetry && (
                 <p className="inline-block mt-2 px-2.5 py-0.5 rounded-full text-xs font-medium bg-[#fef3c7] text-[#92400e] border border-[#fde68a]">
                   ✨ Fun Challenge
@@ -255,7 +255,7 @@ export function Quiz() {
                 className="quiz-replay"
                 onClick={() => void speak(question)}
               >
-                <span aria-hidden="true">🔊</span> 再听一遍
+                <span aria-hidden="true">🔊</span> Play Again
               </button>
             </section>
 
@@ -298,11 +298,11 @@ export function Quiz() {
                 }`}
               >
                 {!answered
-                  ? '听两遍独立音节，再听一遍组词，然后作答。'
+                  ? 'Listen to the syllable twice and the word once, then choose your answer.'
                   : answered.correct
-                    ? '答对了，得 1 分。'
-                    : `答错了，正确答案是 ${TONES[answered.answer - 1].letter} · ${formatPinyin(question.syllable, answered.answer)}。`}
-                {error && <span className="quiz-note__error">（{error}）</span>}
+                    ? 'Correct! +1 point.'
+                    : `Incorrect. Correct answer is ${TONES[answered.answer - 1].letter} · ${formatPinyin(question.syllable, answered.answer)}.`}
+                {error && <span className="quiz-note__error">({error})</span>}
               </p>
               <button
                 type="button"
@@ -310,7 +310,7 @@ export function Quiz() {
                 disabled={!answered}
                 onClick={() => goTo(index + 1)}
               >
-                {isLast ? '查看成绩' : '下一题'}
+                {isLast ? 'View Results' : 'Next Question'}
               </button>
             </footer>
           </article>

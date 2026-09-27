@@ -107,14 +107,14 @@ export function MobileChart({ data }: MobileChartProps) {
       <div className="p-4">
         <div className="flex items-center justify-between mb-3">
           <span className="text-xs font-medium text-[#7e8c84]">
-            声母 <span className="font-bold text-[#0b6b41] text-sm">[{selectedInitial}]</span> 可拼读的音节（共 {availableSyllables.length} 个）
+            Initial <span className="font-bold text-[#0b6b41] text-sm">[{selectedInitial}]</span> Syllables ({availableSyllables.length})
           </span>
-          <span className="text-[11px] text-[#9db0a5]">点击发音</span>
+          <span className="text-[11px] text-[#9db0a5]">Tap to listen</span>
         </div>
 
         {availableSyllables.length === 0 ? (
           <div className="py-12 text-center text-sm text-[#7e8c84] bg-[#fbfdfc] rounded-xl border border-dashed border-[#d8e5dd]">
-            该声母无组合音节
+            No available syllables for this initial
           </div>
         ) : (
           <div className="grid grid-cols-3 gap-2.5">
@@ -181,7 +181,7 @@ export function MobileChart({ data }: MobileChartProps) {
                       isPlaying ? 'text-white/80' : 'text-[#7e8c84]'
                     }`}
                   >
-                    第{['一', '二', '三', '四'][tone - 1]}声
+                    Tone {tone}
                   </span>
                   <span
                     className={`text-sm mt-1 font-serif ${
