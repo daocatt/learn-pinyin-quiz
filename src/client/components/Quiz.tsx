@@ -131,7 +131,7 @@ export function Quiz() {
         <button type="button" className="quiz-back" onClick={() => navigate('/')}>
           ← 返回拼音图
         </button>
-        <span className="quiz-topbar__title">拼音听力测验</span>
+        <span className="quiz-topbar__title">Listening Quiz</span>
         <span className="quiz-topbar__meta">{total ? `共 ${total} 题` : ''}</span>
       </header>
 

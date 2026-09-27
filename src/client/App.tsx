@@ -40,7 +40,7 @@ function ChartPage() {
                 Pinyin Quiz
               </h1>
               <button type="button" className="quiz-cta" onClick={() => navigate('/quiz')}>
-                听力测验
+                Listening Quiz
               </button>
             </div>
 
