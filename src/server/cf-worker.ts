@@ -102,4 +102,30 @@ cfApp.get('/audio/:filename', async (c) => {
   return c.notFound()
 })
 
-export default cfApp
+export interface ScheduledController {
+  scheduledTime: number
+  cron: string
+}
+
+export interface ExecutionContext {
+  waitUntil(promise: Promise<unknown>): void
+  passThroughOnException(): void
+}
+
+export default {
+  fetch: cfApp.fetch,
+  async scheduled(_controller: ScheduledController, env: Bindings, ctx: ExecutionContext): Promise<void> {
+    ctx.waitUntil(
+      (async () => {
+        try {
+          const storage = await getStorage(env?.DB)
+          const result = await storage.cleanupExpiredRounds(90)
+          console.log(`[Scheduled cleanup] 90-day retention cleanup done. Deleted ${result.deletedRounds} rounds.`)
+        } catch (err) {
+          console.error('[Scheduled cleanup] Failed:', err)
+        }
+      })(),
+    )
+  },
+}
+

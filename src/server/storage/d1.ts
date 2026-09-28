@@ -62,9 +62,13 @@ export class D1QuizStorage implements QuizStorage {
           correct INTEGER,
           answered_at TEXT
         );
+        CREATE INDEX IF NOT EXISTS questions_item ON questions(item);
+        CREATE INDEX IF NOT EXISTS rounds_session ON rounds(session);
+        CREATE INDEX IF NOT EXISTS idx_questions_round_id ON questions(round_id);
+        CREATE INDEX IF NOT EXISTS idx_rounds_created_at ON rounds(created_at);
       `)
     } catch {
-      // Ignore if tables already exist
+      // Ignore if tables or indexes already exist
     }
   }
 
@@ -223,4 +227,22 @@ export class D1QuizStorage implements QuizStorage {
       score: r.score ?? 0,
     }))
   }
+
+  async cleanupExpiredRounds(retentionDays = 90): Promise<{ deletedRounds: number }> {
+    const cutoff = new Date(Date.now() - retentionDays * 24 * 60 * 60 * 1000).toISOString()
+    const deleteQuestions = this.d1.prepare(
+      `DELETE FROM questions WHERE round_id IN (
+         SELECT id FROM rounds WHERE created_at < ?
+       )`,
+    ).bind(cutoff)
+
+    const deleteRounds = this.d1.prepare(
+      'DELETE FROM rounds WHERE created_at < ?',
+    ).bind(cutoff)
+
+    const [, rRes] = await this.d1.batch([deleteQuestions, deleteRounds])
+    const deletedRounds = (rRes as D1Response)?.meta?.changes ?? 0
+    return { deletedRounds }
+  }
 }
+

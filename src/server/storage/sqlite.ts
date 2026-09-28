@@ -29,6 +29,7 @@ export class SqliteQuizStorage implements QuizStorage {
         answered_at TEXT
       );
       CREATE INDEX IF NOT EXISTS questions_item ON questions(item);
+      CREATE INDEX IF NOT EXISTS idx_questions_round_id ON questions(round_id);
     `)
 
     const columns = db.prepare('PRAGMA table_info(rounds)').all() as { name: string }[]
@@ -36,6 +37,7 @@ export class SqliteQuizStorage implements QuizStorage {
       db.exec('ALTER TABLE rounds ADD COLUMN session TEXT')
     }
     db.exec('CREATE INDEX IF NOT EXISTS rounds_session ON rounds(session)')
+    db.exec('CREATE INDEX IF NOT EXISTS idx_rounds_created_at ON rounds(created_at)')
 
     this.db = db
   }
@@ -205,4 +207,20 @@ export class SqliteQuizStorage implements QuizStorage {
       score: r.score ?? 0,
     }))
   }
+
+  async cleanupExpiredRounds(retentionDays = 90): Promise<{ deletedRounds: number }> {
+    const db = this.getDb()
+    const cutoff = new Date(Date.now() - retentionDays * 24 * 60 * 60 * 1000).toISOString()
+    db.prepare(
+      `DELETE FROM questions WHERE round_id IN (
+         SELECT id FROM rounds WHERE created_at < ?
+       )`,
+    ).run(cutoff)
+
+    const res = db.prepare('DELETE FROM rounds WHERE created_at < ?').run(cutoff) as {
+      changes?: number
+    }
+    return { deletedRounds: res?.changes ?? 0 }
+  }
 }
+

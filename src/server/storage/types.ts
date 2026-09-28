@@ -36,4 +36,6 @@ export interface QuizStorage {
       score: number
     }>
   >
+  cleanupExpiredRounds(retentionDays?: number): Promise<{ deletedRounds: number }>
 }
+
