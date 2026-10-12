@@ -4,6 +4,7 @@ import { formatPinyin } from '../lib/pinyin'
 import { useQuizAudio, unlockAudio } from '../lib/quiz-audio'
 import { navigate } from '../lib/router'
 import { buildXShareUrl, getLocalHistory, saveRoundResult } from '../lib/history'
+import { createClientRound, gradeClientAnswer } from '../lib/quizEngine'
 import { Confetti } from './Confetti'
 
 /** A/B/C/D map to the four tones in order. */
@@ -30,7 +31,7 @@ export function Quiz() {
   const { speak, stop, preload } = useQuizAudio()
   const started = useRef(false)
 
-  const startRound = useCallback(async () => {
+  const startRound = useCallback(() => {
     stop()
     setLoading(true)
     setError(null)
@@ -40,9 +41,8 @@ export function Quiz() {
     setIndex(0)
     setFinished(false)
     try {
-      const response = await fetch('/api/quiz/round', { method: 'POST' })
-      if (!response.ok) throw new Error(`HTTP ${response.status}`)
-      setRound((await response.json()) as QuizRound)
+      const nextRound = createClientRound()
+      setRound(nextRound)
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : String(cause))
     } finally {
@@ -51,11 +51,9 @@ export function Quiz() {
   }, [stop])
 
   useEffect(() => {
-    // StrictMode mounts effects twice, and a round is persisted server-side, so
-    // make sure only one is ever created.
     if (started.current) return
     started.current = true
-    void startRound()
+    startRound()
   }, [startRound])
 
   const question = round?.questions[index]
@@ -93,18 +91,13 @@ export function Quiz() {
   )
 
   const choose = useCallback(
-    async (choice: number) => {
+    (choice: number) => {
       if (!round || !question || answered || busy) return
       setBusy(true)
       setError(null)
       try {
-        const response = await fetch('/api/quiz/answer', {
-          method: 'POST',
-          headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({ roundId: round.roundId, questionId: question.id, choice }),
-        })
-        if (!response.ok) throw new Error(`HTTP ${response.status}`)
-        const result = (await response.json()) as QuizAnswer
+        const result = gradeClientAnswer(round.roundId, question.id, choice)
+        if (!result) throw new Error('判卷失败，未找到对应题目')
         setAnswers((prev) => ({ ...prev, [question.id]: { choice, ...result } }))
         setScore(result.score)
         // A previously-missed item redeemed — celebrate it.

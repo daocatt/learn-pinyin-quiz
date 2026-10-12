@@ -1,12 +1,8 @@
 import { readFile } from 'node:fs/promises'
 import { serveStatic } from '@hono/node-server/serve-static'
 import { Hono } from 'hono'
-import { getCookie, setCookie } from 'hono/cookie'
 import type { ViteDevServer } from 'vite'
 import { chartData } from '../shared/chart.ts'
-import { answerQuestion, createRound } from './quiz.ts'
-import { getStorage } from './storage/index.ts'
-import type { D1Database } from './storage/d1.ts'
 
 /**
  * The application. It is used twice:
@@ -15,41 +11,10 @@ import type { D1Database } from './storage/d1.ts'
  *
  * @hono/vite-dev-server requires a default export.
  */
-export const app = new Hono<{ Variables: { session: string } }>()
+export const app = new Hono()
 
 /**
- * Quiz history is per-browser, so several people can share one deployment
- * without inheriting each other's mistakes. The id is opaque and carries no
- * authority — it only groups a person's own rounds — which is why the cookie is
- * not marked `Secure`: that would stop it working over plain http in local dev,
- * and the value is not worth protecting from a network observer.
- */
-const SESSION_COOKIE = 'pinyin_sid'
-const SESSION_MAX_AGE = 60 * 60 * 24 * 365
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
-
-app.use('*', async (c, next) => {
-  const existing = getCookie(c, SESSION_COOKIE)
-  // Re-mint anything that is not one of our own ids, so a hand-set cookie cannot
-  // be used to guess at, or collide with, someone else's history.
-  const session = existing && UUID.test(existing) ? existing : crypto.randomUUID()
-  if (session !== existing) {
-    setCookie(c, SESSION_COOKIE, session, {
-      path: '/',
-      httpOnly: true,
-      sameSite: 'Lax',
-      maxAge: SESSION_MAX_AGE,
-    })
-  }
-  c.set('session', session)
-  await next()
-})
-
-/**
- * This is a private study aid, not a public site. `robots.txt` only binds
- * crawlers that choose to obey it, so the header is what actually enforces it —
- * search engines honour `X-Robots-Tag` even on responses they already fetched.
- * `index.html` carries the same directive as a meta tag.
+ * Header directives for search engines.
  */
 app.use('*', async (c, next) => {
   await next()
@@ -59,51 +24,9 @@ app.use('*', async (c, next) => {
 /** Served from `public/`, so it also needs a route in dev (see the catch-all below). */
 app.get('/robots.txt', serveStatic({ root: './public' }))
 
-
 app.get('/api/chart', (c) => c.json(chartData))
 
 app.get('/api/health', (c) => c.json({ ok: true }))
-
-/** Start a fresh round of 20 questions. */
-app.post('/api/quiz/round', async (c) => {
-  const env = c.env as { DB?: D1Database } | undefined
-  const storage = await getStorage(env?.DB)
-  const round = await createRound(storage, c.get('session'))
-  return c.json(round)
-})
-
-/** Grade one answer. Locked after the first submission. */
-app.post('/api/quiz/answer', async (c) => {
-  const body = (await c.req.json().catch(() => null)) as {
-    roundId?: unknown
-    questionId?: unknown
-    choice?: unknown
-  } | null
-
-  const roundId = Number(body?.roundId)
-  const questionId = Number(body?.questionId)
-  const choice = Number(body?.choice)
-  if (!Number.isInteger(roundId) || !Number.isInteger(questionId) || !Number.isInteger(choice)) {
-    return c.json({ error: 'roundId, questionId and choice must be integers' }, 400)
-  }
-  if (choice < 0 || choice > 4) {
-    return c.json({ error: 'choice must be a tone between 1 and 4, or 0 for timeout' }, 400)
-  }
-
-  const env = c.env as { DB?: D1Database } | undefined
-  const storage = await getStorage(env?.DB)
-  const result = await answerQuestion(storage, c.get('session'), roundId, questionId, choice)
-  if (!result) return c.json({ error: 'no such question in this round' }, 404)
-  return c.json(result)
-})
-
-/** Get history of completed rounds for current session. */
-app.get('/api/quiz/history', async (c) => {
-  const env = c.env as { DB?: D1Database } | undefined
-  const storage = await getStorage(env?.DB)
-  const history = await storage.getRoundHistory(c.get('session'), 15)
-  return c.json(history)
-})
 
 /** Syllable recordings live in `public/audio` as `{syllable}{tone}.mp3`. */
 app.use(

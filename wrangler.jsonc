@@ -13,16 +13,5 @@
   "assets": {
     "directory": "./dist/client",
     "binding": "ASSETS"
-  },
-  "d1_databases": [
-    {
-      "binding": "DB",
-      "database_name": "jiaba-pinyin-db",
-      "database_id": "533c07ea-049f-4f6a-bd7b-217fede17c21"
-    }
-  ],
-  "triggers": {
-    "crons": ["0 3 * * *"]
   }
 }
-
